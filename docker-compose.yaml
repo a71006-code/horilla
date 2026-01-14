@@ -11,7 +11,7 @@ services:
     command: sh ./entrypoint.sh
     volumes:
       - /volume1/docker/horilla:/app/horilla
-      - /volume1/docker/horilla/media:/app/media
+      #- /volume1/docker/horilla/media:/app/media
     depends_on:
       db:
         condition: service_healthy
