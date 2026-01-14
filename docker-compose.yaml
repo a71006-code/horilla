@@ -4,7 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-- 18001:8000    restart: unless-stopped
+      - 18000:8000    
+    restart: unless-stopped
     environment:
       DATABASE_URL: "postgres://postgres:postgres@db:5432/horilla"
     command: sh ./entrypoint.sh
