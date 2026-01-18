@@ -196,22 +196,39 @@ def shift_rotate_weekend(rotating_shift, today):
     return
 
 
-def shift_rotate_every(rotating_shift, today):
+def rotate_shift():
     """
-    This method for rotate shift based on every month
+    This method will identify the based on condition to the rotating shift assign
+    and redirect to the chunk method to execute.
     """
-    switch_date = rotating_shift.next_change_date
-    day_date = rotating_shift.rotate_every
-    if switch_date == today:
-        if day_date == switch_date.strftime("%d").lstrip("0"):
-            new_date = today.replace(month=today.month + 1)
-            update_rotating_shift_assign(rotating_shift, new_date)
-        elif day_date == "last":
-            year = today.year
-            month = today.month
-            last_day = calendar.monthrange(int(year), int(month) + 1)[1]
-            new_date = datetime(int(year), int(month) + 1, last_day)
-            update_rotating_shift_assign(rotating_shift, new_date)
+    from base.models import RotatingShiftAssign
+
+    rotating_shifts = RotatingShiftAssign.objects.filter(is_active=True)
+    today = datetime.now().date()
+    r_shifts = rotating_shifts.filter(start_date__lte=today)
+
+    # Initialize as empty queryset instead of None
+    rotating_shifts_modified = rotating_shifts.none()
+
+    for r_shift in r_shifts:
+        emp_shift = rotating_shifts.filter(
+            employee_id=r_shift.employee_id, start_date__lte=today
+        ).exclude(id=r_shift.id)
+        rotating_shifts_modified = rotating_shifts.exclude(
+            id__in=emp_shift.values_list("id", flat=True)
+        )
+        emp_shift.update(is_active=False)
+
+    # Now safe even if r_shifts was empty
+    for rotating_shift in rotating_shifts_modified:
+        based_on = rotating_shift.based_on
+        if based_on == "after":
+            shift_rotate_after_day(rotating_shift, today)
+        elif based_on == "weekly":
+            shift_rotate_weekend(rotating_shift, today)
+        elif based_on == "monthly":
+            shift_rotate_every(rotating_shift, today)
+
     return
 
 
