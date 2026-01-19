@@ -190,6 +190,21 @@ class Contract(HorillaModel):
         blank=True,
         verbose_name=_("Filing Status"),
     )
+    ca_filing_status = models.ForeignKey(
+        FilingStatus,
+        on_delete=models.PROTECT,
+        related_name="ca_contracts",
+        null=True,
+        blank=True,
+        verbose_name=_("CA Filing Status"),
+        help_text=_("California state tax filing status for Method B calculation"),
+    )
+    ca_allowances = models.IntegerField(
+        default=0,
+        verbose_name=_("CA Allowances"),
+        help_text=_("Number of California state withholding allowances"),
+        validators=[min_zero],
+    )
     contract_status = models.CharField(
         choices=CONTRACT_STATUS_CHOICES,
         max_length=250,
@@ -1065,6 +1080,7 @@ class Deduction(HorillaModel):
         ("gross_pay", _("Gross Pay")),
         ("taxable_gross_pay", _("Taxable Gross Pay")),
         ("net_pay", _("Net Pay")),
+        ("ca_state_tax", _("California State Tax (Method B)")),
     ]
 
     exceed_choice = [

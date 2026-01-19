@@ -1040,6 +1040,172 @@ def calculate_based_on_children(*_args, **kwargs):
     return amount
 
 
+# =============================================================================
+# California State Tax Calculation (Method B - Exact Calculation) 2026
+# Based on EDD DE 44 2026 Withholding Schedules
+# =============================================================================
+
+# 2026 CA State Tax Brackets (Annual amounts, will be prorated based on pay period)
+CA_TAX_BRACKETS_2026 = [
+    # (min_income, max_income, tax_rate, base_tax)
+    # Single/Married (0 or 1 allowance) / Head of Household
+    (0, 10756, 0.011, 0),
+    (10756, 25499, 0.022, 118.32),
+    (25499, 40243, 0.044, 442.67),
+    (40243, 55866, 0.066, 1091.41),
+    (55866, 70611, 0.088, 2123.53),
+    (70611, 360406, 0.1023, 3421.09),
+    (360406, 432488, 0.1133, 32069.16),
+    (432488, 721246, 0.1243, 40237.55),
+    (721246, float('inf'), 0.1463, 76127.58),
+]
+
+# 2026 Standard Deductions (Annual)
+CA_STANDARD_DEDUCTION_SINGLE = 5706  # Single or Married with 0-1 allowances
+CA_STANDARD_DEDUCTION_MARRIED_HOH = 11412  # Married 2+ allowances or Head of Household
+
+# 2026 Exemption Allowance Credit (Annual per allowance)
+CA_EXEMPTION_ALLOWANCE_CREDIT = 168.30
+
+
+def get_ca_standard_deduction(filing_status_name, allowances):
+    """
+    Determine the CA standard deduction based on filing status and allowances.
+    
+    Args:
+        filing_status_name (str): The filing status name (e.g., "CA Single", "CA Married")
+        allowances (int): Number of CA withholding allowances
+        
+    Returns:
+        float: The annual standard deduction amount
+    """
+    filing_status_lower = filing_status_name.lower() if filing_status_name else ""
+    
+    # Head of Household always gets the higher deduction
+    if "head" in filing_status_lower or "hoh" in filing_status_lower:
+        return CA_STANDARD_DEDUCTION_MARRIED_HOH
+    
+    # Married with 2+ allowances gets the higher deduction
+    if "married" in filing_status_lower and allowances >= 2:
+        return CA_STANDARD_DEDUCTION_MARRIED_HOH
+    
+    # Single or Married with 0-1 allowances gets the lower deduction
+    return CA_STANDARD_DEDUCTION_SINGLE
+
+
+def calculate_ca_tax_from_brackets(taxable_income):
+    """
+    Calculate CA state tax using the progressive tax bracket system.
+    
+    Args:
+        taxable_income (float): The taxable income after standard deduction
+        
+    Returns:
+        float: The calculated tax amount
+    """
+    if taxable_income <= 0:
+        return 0
+    
+    for min_income, max_income, rate, base_tax in CA_TAX_BRACKETS_2026:
+        if taxable_income <= max_income:
+            return base_tax + (taxable_income - min_income) * rate
+    
+    # If income exceeds all brackets, use the last bracket
+    last_bracket = CA_TAX_BRACKETS_2026[-1]
+    return last_bracket[3] + (taxable_income - last_bracket[0]) * last_bracket[2]
+
+
+def calculate_ca_state_tax(*_args, **kwargs):
+    """
+    Calculate California State Income Tax using Method B (Exact Calculation Method) for 2026.
+    
+    This function implements the CA EDD withholding calculation based on:
+    1. Taxable gross pay
+    2. Filing status (determines standard deduction)
+    3. Number of withholding allowances (determines exemption credit)
+    
+    The calculation follows these steps:
+    - Step 1: Subtract standard deduction from taxable gross pay
+    - Step 2: Apply progressive tax rates to get computed tax
+    - Step 3: Calculate exemption credit (allowances × $168.30 annual)
+    - Step 4: Final tax = Computed tax - Exemption credit
+    
+    Args:
+        employee: The employee object
+        start_date: Start date of the pay period
+        end_date: End date of the pay period
+        component: The deduction component
+        allowances: Dictionary containing allowance data
+        total_allowance: Total allowance amount
+        basic_pay: Basic pay amount
+        day_dict: Dictionary with working day information
+        
+    Returns:
+        float: The calculated CA state tax amount for the pay period
+    """
+    employee = kwargs["employee"]
+    day_dict = kwargs["day_dict"]
+    
+    # Get the taxable gross pay for the period
+    taxable_gross_pay_data = calculate_taxable_gross_pay(**kwargs)
+    period_taxable_gross = taxable_gross_pay_data.get("taxable_gross_pay", 0)
+    
+    # Get the employee's active contract to retrieve CA filing status and allowances
+    active_contract = Contract.objects.filter(
+        employee_id=employee,
+        contract_status="active"
+    ).first()
+    
+    if not active_contract:
+        # No active contract, return 0 tax
+        return 0
+    
+    ca_filing_status = active_contract.ca_filing_status
+    ca_allowances = active_contract.ca_allowances or 0
+    
+    if not ca_filing_status:
+        # No CA filing status configured, return 0 tax
+        return 0
+    
+    filing_status_name = str(ca_filing_status.filing_status) if ca_filing_status else ""
+    
+    # Determine the pay period multiplier to annualize income
+    # Common pay frequencies and their annual multipliers
+    pay_frequency = active_contract.pay_frequency
+    pay_frequency_multipliers = {
+        "weekly": 52,
+        "monthly": 12,
+        "semi_monthly": 24,
+    }
+    annual_multiplier = pay_frequency_multipliers.get(pay_frequency, 12)
+    
+    # Annualize the period income for bracket calculation
+    annual_taxable_gross = period_taxable_gross * annual_multiplier
+    
+    # Step 1: Calculate standard deduction
+    standard_deduction = get_ca_standard_deduction(filing_status_name, ca_allowances)
+    
+    # Step 2: Calculate taxable income
+    annual_taxable_income = max(0, annual_taxable_gross - standard_deduction)
+    
+    # Step 3: Apply tax brackets
+    annual_computed_tax = calculate_ca_tax_from_brackets(annual_taxable_income)
+    
+    # Step 4: Calculate exemption credit
+    annual_exemption_credit = ca_allowances * CA_EXEMPTION_ALLOWANCE_CREDIT
+    
+    # Step 5: Calculate final annual tax
+    annual_tax = max(0, annual_computed_tax - annual_exemption_credit)
+    
+    # Convert back to period amount
+    period_tax = annual_tax / annual_multiplier
+    
+    # Round to 2 decimal places
+    period_tax = round(period_tax, 2)
+    
+    return period_tax
+
+
 calculation_mapping = {
     "basic_pay": calculate_based_on_basic_pay,
     "gross_pay": calculate_based_on_gross_pay,
@@ -1050,4 +1216,5 @@ calculation_mapping = {
     "overtime": calculate_based_on_overtime,
     "work_type_id": calculate_based_on_work_type,
     "children": calculate_based_on_children,
+    "ca_state_tax": calculate_ca_state_tax,
 }
