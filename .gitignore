@@ -134,6 +134,7 @@ dmypy.json
 **/migrations/**
 !**/migrations
 !**/migrations/__init__.py
+!payroll/migrations/*.py
 
 # media file
 media/
