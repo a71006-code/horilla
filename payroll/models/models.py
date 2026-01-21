@@ -1284,7 +1284,12 @@ class Deduction(HorillaModel):
                         "If the 'Is fixed' field is disabled, the 'Based on' field is required."
                     )
                 )
-        if not self.is_fixed and self.based_on and not self.rate:
+        if (
+            not self.is_fixed
+            and self.based_on
+            and not self.rate
+            and self.based_on != "ca_state_tax"
+        ):
             raise ValidationError(
                 _(
                     "Employee rate must be specified for deductions that are not fixed amount"
