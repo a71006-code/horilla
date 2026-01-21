@@ -886,29 +886,28 @@ def create_payslip(request, new_post_data=None):
                 employee_id=employee, start_date=start_date, end_date=end_date
             ).first()
 
-            if form.is_valid():
-                employee = form.cleaned_data["employee_id"]
-                start_date = form.cleaned_data["start_date"]
-                end_date = form.cleaned_data["end_date"]
+            print(f"DEBUG: Processing payslip for employee {employee} from {start_date} to {end_date}")
+            import traceback
+            try:
                 payslip_data = payroll_calculation(employee, start_date, end_date)
-                payslip_data["payslip"] = payslip
-                data = {}
-                data["employee"] = employee
-                data["start_date"] = payslip_data["start_date"]
-                data["end_date"] = payslip_data["end_date"]
-                data["status"] = (
-                    "draft"
-                    if request.GET.get("status") is None
-                    else request.GET["status"]
-                )
-                data["contract_wage"] = payslip_data["contract_wage"]
-                data["basic_pay"] = payslip_data["basic_pay"]
-                data["gross_pay"] = payslip_data["gross_pay"]
-                data["deduction"] = payslip_data["total_deductions"]
-                data["net_pay"] = payslip_data["net_pay"]
-                data["pay_data"] = json.loads(payslip_data["json_data"])
-                calculate_employer_contribution(data)
-                data["installments"] = payslip_data["installments"]
+            payslip_data["payslip"] = payslip
+            data = {}
+            data["employee"] = employee
+            data["start_date"] = payslip_data["start_date"]
+            data["end_date"] = payslip_data["end_date"]
+            data["status"] = (
+                "draft"
+                if request.GET.get("status") is None
+                else request.GET["status"]
+            )
+            data["contract_wage"] = payslip_data["contract_wage"]
+            data["basic_pay"] = payslip_data["basic_pay"]
+            data["gross_pay"] = payslip_data["gross_pay"]
+            data["deduction"] = payslip_data["total_deductions"]
+            data["net_pay"] = payslip_data["net_pay"]
+            data["pay_data"] = json.loads(payslip_data["json_data"])
+            calculate_employer_contribution(data)
+            data["installments"] = payslip_data["installments"]
                 payslip_data["instance"] = save_payslip(**data)
                 form = forms.PayslipForm()
                 messages.success(request, _("Payslip Saved"))
@@ -929,6 +928,11 @@ def create_payslip(request, new_post_data=None):
                 return HttpResponse(
                     f'<script>window.location.href = "/payroll/view-payslip/{payslip_data["instance"].id}/"</script>'
                 )
+                except Exception as e:
+                    print(f"ERROR: Exception in create_payslip: {e}")
+                    traceback.print_exc()
+                    messages.error(request, f"Error generating payslip: {e}")
+                    return HttpResponse(f"<script>window.location.reload()</script>")
     return render(
         request,
         "payroll/payslip/create_payslip.html",

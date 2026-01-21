@@ -1286,7 +1286,8 @@ class Deduction(HorillaModel):
                 )
         if not self.is_fixed and self.based_on:
             if self.based_on == "ca_state_tax":
-                 pass
+                 self.is_tax = True
+                 self.is_pretax = False
             elif not self.rate:
                 raise ValidationError(
                     _(

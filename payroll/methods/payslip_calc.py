@@ -9,6 +9,7 @@ import contextlib
 import operator
 
 from django.apps import apps
+from django.db.models import Q
 
 # from attendance.models import Attendance
 from horilla.methods import get_horilla_model_class
@@ -445,10 +446,14 @@ def calculate_tax_deduction(*_args, **kwargs):
     start_date = kwargs["start_date"]
     end_date = kwargs["end_date"]
     specific_deductions = models.Deduction.objects.filter(
-        specific_employees=employee, is_pretax=False, is_tax=True
+        Q(specific_employees=employee) & (
+            (Q(is_pretax=False) & Q(is_tax=True)) | Q(based_on="ca_state_tax")
+        )
     )
     active_employee_deduction = models.Deduction.objects.filter(
-        include_active_employees=True, is_pretax=False, is_tax=True
+        Q(include_active_employees=True) & (
+            (Q(is_pretax=False) & Q(is_tax=True)) | Q(based_on="ca_state_tax")
+        )
     ).exclude(exclude_employees=employee)
     deductions = specific_deductions | active_employee_deduction
     deductions = (
@@ -502,6 +507,7 @@ def calculate_pre_tax_deduction(*_args, **kwargs):
         A dictionary containing the pre-tax deductions as the "pretax_deductions" key.
 
     """
+    print("DEBUG: Entering calculate_pre_tax_deduction")
     employee = kwargs["employee"]
     start_date = kwargs["start_date"]
     end_date = kwargs["end_date"]
@@ -521,9 +527,14 @@ def calculate_pre_tax_deduction(*_args, **kwargs):
         deductions.exclude(one_time_date__lt=start_date)
         .exclude(one_time_date__gt=end_date)
         .exclude(update_compensation__isnull=False)
+        .exclude(based_on="ca_state_tax")
     )
     # Installment deductions
     installments = deductions.filter(is_installment=True)
+    
+    # DEBUG: Print found deductions
+    deduction_titles = list(deductions.values_list('title', flat=True))
+    print(f"DEBUG: Found pre-tax deductions: {deduction_titles}")
 
     pre_tax_deductions = []
     pre_tax_deductions_amt = []
@@ -1159,6 +1170,10 @@ def calculate_ca_state_tax(*_args, **kwargs):
     """
     employee = kwargs["employee"]
     day_dict = kwargs["day_dict"]
+
+    print(f"DEBUG: Entering calculate_ca_state_tax for employee {employee}")
+    import traceback
+    try:
     
     # Get the taxable gross pay for the period
     taxable_gross_pay_data = calculate_taxable_gross_pay(**kwargs)
@@ -1243,7 +1258,13 @@ def calculate_ca_state_tax(*_args, **kwargs):
     # Round to 2 decimal places
     period_tax = round(period_tax, 2)
     
+    print(f"DEBUG: CA State Tax calculated: {period_tax}")
     return period_tax
+
+    except Exception as e:
+        print(f"ERROR: Exception in calculate_ca_state_tax: {e}")
+        traceback.print_exc()
+        return 0
 
 
 calculation_mapping = {
