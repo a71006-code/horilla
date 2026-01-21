@@ -22,6 +22,7 @@ from payroll.models.models import (
     LoanAccount,
     MultipleCondition,
 )
+from payroll.models.tax_models import TaxBracket
 
 
 def return_none(a, b):
@@ -1093,12 +1094,14 @@ def get_ca_standard_deduction(filing_status_name, allowances):
     return CA_STANDARD_DEDUCTION_SINGLE
 
 
-def calculate_ca_tax_from_brackets(taxable_income):
+def calculate_ca_tax_from_brackets(taxable_income, brackets=None):
     """
     Calculate CA state tax using the progressive tax bracket system.
     
     Args:
         taxable_income (float): The taxable income after standard deduction
+        brackets (list): Optional list of bracket tuples (min, max, rate, base_tax).
+                        If None, uses CA_TAX_BRACKETS_2026.
         
     Returns:
         float: The calculated tax amount
@@ -1106,13 +1109,24 @@ def calculate_ca_tax_from_brackets(taxable_income):
     if taxable_income <= 0:
         return 0
     
-    for min_income, max_income, rate, base_tax in CA_TAX_BRACKETS_2026:
+    # Use provided brackets or default
+    tax_brackets = brackets if brackets is not None else CA_TAX_BRACKETS_2026
+    
+    # If using DB brackets (objects), convert/handle them
+    # This function expects a uniform format. 
+    # Let's assume the caller processes DB objects into the list format expected here:
+    # (min_income, max_income, tax_rate, base_tax)
+    
+    for min_income, max_income, rate, base_tax in tax_brackets:
         if taxable_income <= max_income:
             return base_tax + (taxable_income - min_income) * rate
     
     # If income exceeds all brackets, use the last bracket
-    last_bracket = CA_TAX_BRACKETS_2026[-1]
-    return last_bracket[3] + (taxable_income - last_bracket[0]) * last_bracket[2]
+    if tax_brackets:
+        last_bracket = tax_brackets[-1]
+        return last_bracket[3] + (taxable_income - last_bracket[0]) * last_bracket[2]
+    
+    return 0
 
 
 def calculate_ca_state_tax(*_args, **kwargs):
@@ -1189,7 +1203,33 @@ def calculate_ca_state_tax(*_args, **kwargs):
     annual_taxable_income = max(0, annual_taxable_gross - standard_deduction)
     
     # Step 3: Apply tax brackets
-    annual_computed_tax = calculate_ca_tax_from_brackets(annual_taxable_income)
+    # Check for DB brackets first
+    db_brackets = TaxBracket.objects.filter(filing_status_id=ca_filing_status).order_by('min_income')
+    
+    active_brackets = None
+    if db_brackets.exists():
+        # Convert DB brackets to the format expected by calculation function
+        # (min, max, rate, cumulative_base_tax)
+        # Note: DB usually stores just rate and range. We need to calculate the cumulative base tax.
+        active_brackets = []
+        running_base_tax = 0.0
+        
+        for i, bracket in enumerate(db_brackets):
+            # Parse values (DB models use float)
+            b_min = bracket.min_income
+            b_max = bracket.max_income if bracket.max_income is not None else float('inf')
+            b_rate = bracket.tax_rate / 100.0 # DB usually stores as percentage (e.g. 1.1 for 1.1%)
+            
+            active_brackets.append((b_min, b_max, b_rate, running_base_tax))
+            
+            # Calculate tax for the full band of this bracket to add to base for next bracket
+            if b_max != float('inf'):
+                band_income = b_max - b_min
+                running_base_tax += band_income * b_rate
+                
+    # If no DB brackets, active_brackets remains None and function will use default
+    
+    annual_computed_tax = calculate_ca_tax_from_brackets(annual_taxable_income, brackets=active_brackets)
     
     # Step 4: Calculate exemption credit
     annual_exemption_credit = ca_allowances * CA_EXEMPTION_ALLOWANCE_CREDIT
