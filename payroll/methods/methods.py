@@ -559,7 +559,7 @@ def calculate_employer_contribution(data):
                         id=deduction.get("deduction_id")
                     ).first()
                     if object:
-                        amount = pay_head_data.get(object.based_on)
+                        amount = pay_head_data.get(object.based_on) or 0.0
                         employer_contribution_amount = (
                             amount * object.employer_rate
                         ) / 100
