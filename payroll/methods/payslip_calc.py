@@ -1174,92 +1174,91 @@ def calculate_ca_state_tax(*_args, **kwargs):
     print(f"DEBUG: Entering calculate_ca_state_tax for employee {employee}")
     import traceback
     try:
-    
-    # Get the taxable gross pay for the period
-    taxable_gross_pay_data = calculate_taxable_gross_pay(**kwargs)
-    period_taxable_gross = taxable_gross_pay_data.get("taxable_gross_pay", 0)
-    
-    # Get the employee's active contract to retrieve CA filing status and allowances
-    active_contract = Contract.objects.filter(
-        employee_id=employee,
-        contract_status="active"
-    ).first()
-    
-    if not active_contract:
-        # No active contract, return 0 tax
-        return 0
-    
-    ca_filing_status = active_contract.ca_filing_status
-    ca_allowances = active_contract.ca_allowances or 0
-    
-    if not ca_filing_status:
-        # No CA filing status configured, return 0 tax
-        return 0
-    
-    filing_status_name = str(ca_filing_status.filing_status) if ca_filing_status else ""
-    
-    # Determine the pay period multiplier to annualize income
-    # Common pay frequencies and their annual multipliers
-    pay_frequency = active_contract.pay_frequency
-    pay_frequency_multipliers = {
-        "weekly": 52,
-        "monthly": 12,
-        "semi_monthly": 24,
-    }
-    annual_multiplier = pay_frequency_multipliers.get(pay_frequency, 12)
-    
-    # Annualize the period income for bracket calculation
-    annual_taxable_gross = period_taxable_gross * annual_multiplier
-    
-    # Step 1: Calculate standard deduction
-    standard_deduction = get_ca_standard_deduction(filing_status_name, ca_allowances)
-    
-    # Step 2: Calculate taxable income
-    annual_taxable_income = max(0, annual_taxable_gross - standard_deduction)
-    
-    # Step 3: Apply tax brackets
-    # Check for DB brackets first
-    db_brackets = TaxBracket.objects.filter(filing_status_id=ca_filing_status).order_by('min_income')
-    
-    active_brackets = None
-    if db_brackets.exists():
-        # Convert DB brackets to the format expected by calculation function
-        # (min, max, rate, cumulative_base_tax)
-        # Note: DB usually stores just rate and range. We need to calculate the cumulative base tax.
-        active_brackets = []
-        running_base_tax = 0.0
+        # Get the taxable gross pay for the period
+        taxable_gross_pay_data = calculate_taxable_gross_pay(**kwargs)
+        period_taxable_gross = taxable_gross_pay_data.get("taxable_gross_pay", 0)
         
-        for i, bracket in enumerate(db_brackets):
-            # Parse values (DB models use float)
-            b_min = bracket.min_income
-            b_max = bracket.max_income if bracket.max_income is not None else float('inf')
-            b_rate = bracket.tax_rate / 100.0 # DB usually stores as percentage (e.g. 1.1 for 1.1%)
+        # Get the employee's active contract to retrieve CA filing status and allowances
+        active_contract = Contract.objects.filter(
+            employee_id=employee,
+            contract_status="active"
+        ).first()
+        
+        if not active_contract:
+            # No active contract, return 0 tax
+            return 0
+        
+        ca_filing_status = active_contract.ca_filing_status
+        ca_allowances = active_contract.ca_allowances or 0
+        
+        if not ca_filing_status:
+            # No CA filing status configured, return 0 tax
+            return 0
+        
+        filing_status_name = str(ca_filing_status.filing_status) if ca_filing_status else ""
+        
+        # Determine the pay period multiplier to annualize income
+        # Common pay frequencies and their annual multipliers
+        pay_frequency = active_contract.pay_frequency
+        pay_frequency_multipliers = {
+            "weekly": 52,
+            "monthly": 12,
+            "semi_monthly": 24,
+        }
+        annual_multiplier = pay_frequency_multipliers.get(pay_frequency, 12)
+        
+        # Annualize the period income for bracket calculation
+        annual_taxable_gross = period_taxable_gross * annual_multiplier
+        
+        # Step 1: Calculate standard deduction
+        standard_deduction = get_ca_standard_deduction(filing_status_name, ca_allowances)
+        
+        # Step 2: Calculate taxable income
+        annual_taxable_income = max(0, annual_taxable_gross - standard_deduction)
+        
+        # Step 3: Apply tax brackets
+        # Check for DB brackets first
+        db_brackets = TaxBracket.objects.filter(filing_status_id=ca_filing_status).order_by('min_income')
+        
+        active_brackets = None
+        if db_brackets.exists():
+            # Convert DB brackets to the format expected by calculation function
+            # (min, max, rate, cumulative_base_tax)
+            # Note: DB usually stores just rate and range. We need to calculate the cumulative base tax.
+            active_brackets = []
+            running_base_tax = 0.0
             
-            active_brackets.append((b_min, b_max, b_rate, running_base_tax))
-            
-            # Calculate tax for the full band of this bracket to add to base for next bracket
-            if b_max != float('inf'):
-                band_income = b_max - b_min
-                running_base_tax += band_income * b_rate
+            for i, bracket in enumerate(db_brackets):
+                # Parse values (DB models use float)
+                b_min = bracket.min_income
+                b_max = bracket.max_income if bracket.max_income is not None else float('inf')
+                b_rate = bracket.tax_rate / 100.0 # DB usually stores as percentage (e.g. 1.1 for 1.1%)
                 
-    # If no DB brackets, active_brackets remains None and function will use default
-    
-    annual_computed_tax = calculate_ca_tax_from_brackets(annual_taxable_income, brackets=active_brackets)
-    
-    # Step 4: Calculate exemption credit
-    annual_exemption_credit = ca_allowances * CA_EXEMPTION_ALLOWANCE_CREDIT
-    
-    # Step 5: Calculate final annual tax
-    annual_tax = max(0, annual_computed_tax - annual_exemption_credit)
-    
-    # Convert back to period amount
-    period_tax = annual_tax / annual_multiplier
-    
-    # Round to 2 decimal places
-    period_tax = round(period_tax, 2)
-    
-    print(f"DEBUG: CA State Tax calculated: {period_tax}")
-    return period_tax
+                active_brackets.append((b_min, b_max, b_rate, running_base_tax))
+                
+                # Calculate tax for the full band of this bracket to add to base for next bracket
+                if b_max != float('inf'):
+                    band_income = b_max - b_min
+                    running_base_tax += band_income * b_rate
+                    
+        # If no DB brackets, active_brackets remains None and function will use default
+        
+        annual_computed_tax = calculate_ca_tax_from_brackets(annual_taxable_income, brackets=active_brackets)
+        
+        # Step 4: Calculate exemption credit
+        annual_exemption_credit = ca_allowances * CA_EXEMPTION_ALLOWANCE_CREDIT
+        
+        # Step 5: Calculate final annual tax
+        annual_tax = max(0, annual_computed_tax - annual_exemption_credit)
+        
+        # Convert back to period amount
+        period_tax = annual_tax / annual_multiplier
+        
+        # Round to 2 decimal places
+        period_tax = round(period_tax, 2)
+        
+        print(f"DEBUG: CA State Tax calculated: {period_tax}")
+        return period_tax
 
     except Exception as e:
         print(f"ERROR: Exception in calculate_ca_state_tax: {e}")
