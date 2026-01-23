@@ -1081,6 +1081,7 @@ class Deduction(HorillaModel):
         ("taxable_gross_pay", _("Taxable Gross Pay")),
         ("net_pay", _("Net Pay")),
         ("ca_state_tax", _("California State Tax (Method B)")),
+        ("federal_tax", _("US Federal Tax (2026)")),
     ]
 
     exceed_choice = [

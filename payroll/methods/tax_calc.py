@@ -16,7 +16,7 @@ from payroll.methods.payslip_calc import (
     calculate_gross_pay,
     calculate_taxable_gross_pay,
 )
-from payroll.models.models import Contract
+from payroll.models.models import Contract, Deduction
 from payroll.models.tax_models import TaxBracket
 
 logger = logging.getLogger(__name__)
@@ -107,8 +107,19 @@ def pass_print(*args, **kwargs):
         except Exception as e:
             logger.error(e)
 
-    federal_tax_for_period = 0
     if federal_tax and (tax_brackets.exists() or filing.use_py):
+        # W-4 Step 3: Depedents/Credits (Annual Reduction)
+        # Look for a deduction named "Federal Tax Credit"
+        credit_deduction = Deduction.objects.filter(
+            specific_employees=employee,
+            title__iexact="Federal Tax Credit"
+        ).first()
+
+        if credit_deduction and credit_deduction.amount:
+             # Subtract credit from ANNUAL tax
+             # Ensure tax doesn't go below zero
+             federal_tax = max(0, federal_tax - credit_deduction.amount)
+
         daily_federal_tax = federal_tax / total_days
         federal_tax_for_period = daily_federal_tax * num_days
 
@@ -119,4 +130,16 @@ def pass_print(*args, **kwargs):
         start_date=start_date,
         end_date=end_date,
     )
+
+    # W-4 Step 4(c): Extra Withholding (Per Period Addition)
+    # Look for a deduction named "Federal Extra Withholding"
+    extra_withholding_deduction = Deduction.objects.filter(
+        specific_employees=employee,
+        title__iexact="Federal Extra Withholding"
+    ).first()
+
+    if extra_withholding_deduction and extra_withholding_deduction.amount:
+        federal_tax_for_period += extra_withholding_deduction.amount
+
     return federal_tax_for_period
+
