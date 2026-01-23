@@ -16,8 +16,9 @@ from payroll.methods.payslip_calc import (
     calculate_gross_pay,
     calculate_taxable_gross_pay,
 )
-from payroll.models.models import Contract, Deduction
+from payroll.models.models import Contract, Deduction, Payslip
 from payroll.models.tax_models import TaxBracket
+from django.db.models import Sum, Q
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +141,48 @@ def pass_print(*args, **kwargs):
 
     if extra_withholding_deduction and extra_withholding_deduction.amount:
         federal_tax_for_period += extra_withholding_deduction.amount
+
+    # Additional Medicare Tax (0.9% on wages > $200,000 / $250,000)
+    # 1. Get Previous YTD Gross Pay
+    current_year = end_date.year
+    previous_payslips = Payslip.objects.filter(
+        employee_id=employee,
+        start_date__year=current_year,
+        status__in=["confirmed", "paid"]
+    ).exclude(
+        # Exclude current slip if it somehow exists (e.g. re-run)
+        start_date=start_date,
+        end_date=end_date
+    )
+    previous_ytd_gross = previous_payslips.aggregate(total=Sum("gross_pay"))["total"] or 0.0
+    
+    # 2. Add Current Pay
+    # CORRECT: Use 'gross_pay' from kwargs (guaranteed by component_views.py)
+    # If falling back, 'basic_pay' is safer than 'income' (which might be reduced taxable gross)
+    current_period_gross = kwargs.get("gross_pay")
+    if current_period_gross is None:
+         # Fallback if called outside standard payroll loop
+         current_period_gross = kwargs.get("basic_pay", 0.0)
+
+    current_ytd_gross = previous_ytd_gross + current_period_gross
+
+    # 3. Determine Threshold
+    threshold_amount = 200000.0
+    filing_status_str = str(filing).lower()
+    if "married" in filing_status_str or "joint" in filing_status_str:
+        threshold_amount = 250000.0
+    
+    # 4. Calculate Tax on Excess
+    if current_ytd_gross > threshold_amount:
+        # Amount exceeding threshold total
+        total_excess = current_ytd_gross - threshold_amount
+        # Amount that was ALREADY taxed in previous periods
+        previous_excess = max(0, previous_ytd_gross - threshold_amount)
+        # Amount to tax THIS period
+        taxable_excess_this_period = total_excess - previous_excess
+        
+        additional_medicare_tax = taxable_excess_this_period * 0.009
+        federal_tax_for_period += additional_medicare_tax
 
     return federal_tax_for_period
 

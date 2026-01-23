@@ -10,7 +10,14 @@ from base.models import Company
 class FederalTaxW4Test(TestCase):
     def setUp(self):
         # Create Company
-        self.company = Company.objects.create(name="Test Company")
+        self.company = Company.objects.create(
+            company="Test Company",
+            address="123 Test St",
+            country="USA",
+            state="CA",
+            city="Test City",
+            zip="12345"
+        )
 
         # Create Filing Status
         self.filing_status = FilingStatus.objects.create(
@@ -130,3 +137,56 @@ class FederalTaxW4Test(TestCase):
         # Total = 150.0
         
         self.assertAlmostEqual(tax, 150.0, delta=1.0)
+
+    def test_additional_medicare_tax_high_earner(self):
+        # Scenario: Married employee (Limit $250k)
+        # Previous YTD: $249,000 (just under limit)
+        # Current Pay: $2,000
+        # Total YTD: $251,000
+        # Excess: $1,000
+        # Tax: $1,000 * 0.9% = $9.00
+        
+        # 1. Create a previous payslip (Confirmed)
+        Payslip.objects.create(
+            employee_id=self.employee,
+            start_date=date(2024, 1, 1),
+            end_date=date(2024, 6, 30),
+            gross_pay=249000.0,
+            status="confirmed",
+            pay_head_data={} # Dummy
+        )
+        
+        # 2. Run Calc for current period
+        start_date = date(2024, 7, 1)
+        end_date = date(2024, 7, 7) # 1 week
+        
+        # We need to simulate a Gross Pay of roughly $2000 for this week.
+        # Logic in tax_calc uses 'basic_pay' to derive income. 
+        # Annualized = 2000 * 52 = 104k.
+        
+        tax = calculate_taxable_amount(
+            employee=self.employee.id,
+            start_date=start_date,
+            end_date=end_date,
+            basic_pay=2000.0, # Will be annualized to ~104k
+            gross_pay=2000.0, # Explicit gross pay for Medicare check
+        )
+        
+        # Expected:
+        # Base Federal Tax (10% of 2000) = ~200.0
+        # Additional Medicare (0.9% of 1000 excess) = 9.0
+        # Total = ~209.0
+        
+        self.assertTrue(tax > 205.0)
+        # Check if it includes roughly 9.0 extra from base 200
+        # 10% of 2000 = 200. 
+        # Actually logic is: 2000 / 7 * 366... it's precise.
+        
+        # Exact check:
+        # Annual Income = 2000/7 * 366 = 104,571.42
+        # Annual Tax = 10,457.14
+        # Base Period Tax = 10,457.14 / 366 * 7 = 200.00
+        # Add Med Tax = 9.00
+        # Total = 209.00
+        self.assertAlmostEqual(tax, 209.0, delta=1.0)
+
