@@ -56,6 +56,7 @@ SIDEBARS = [
     "asset",
     "helpdesk",
     "project",
+    "report",
 ]
 
 WHITE_LABELLING = False

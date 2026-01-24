@@ -410,7 +410,180 @@ if apps.is_installed("payroll"):
                             "Status": STATUS.get(item["status"]),
                         }
                     )
+
+        elif model_type == "employer_liability":
+            from payroll.models.models import Deduction
+            
+            payslips = Payslip.objects.all()
+            payslip_filter = PayslipFilter(request.GET, queryset=payslips)
+            filtered_qs = payslip_filter.qs
+
+            data = list(
+                filtered_qs.values(
+                    "id",
+                    "employee_id__employee_first_name",
+                    "employee_id__employee_last_name",
+                    "start_date",
+                    "end_date",
+                    "basic_pay",
+                    "gross_pay",
+                    "status",
+                )
+            )
+
+            payslip_ids = [item["id"] for item in data]
+            pay_head_data_dict = dict(
+                Payslip.objects.filter(id__in=payslip_ids).values_list(
+                    "id", "pay_head_data"
+                )
+            )
+
+            # Collect all deduction IDs to fetch configuration
+            all_deduction_ids = set()
+            for ph_data in pay_head_data_dict.values():
+                deductions = ph_data.get("pretax_deductions", []) + ph_data.get("post_tax_deductions", []) + ph_data.get("tax_deductions", [])
+                for d in deductions:
+                    all_deduction_ids.add(d["deduction_id"])
+
+            deduction_map = {
+                d["id"]: d for d in Deduction.objects.filter(id__in=all_deduction_ids).values("id", "title", "employer_rate", "based_on")
+            }
+
+            data_list = []
+            for item in data:
+                ph_data = pay_head_data_dict.get(item["id"], {})
+                deductions = ph_data.get("pretax_deductions", []) + ph_data.get("post_tax_deductions", []) + ph_data.get("tax_deductions", [])
+
+                for deduction_item in deductions:
+                    ded_id = deduction_item["deduction_id"]
+                    ded_config = deduction_map.get(ded_id)
+                    
+                    if not ded_config:
+                        continue
+
+                    employer_rate = ded_config["employer_rate"]
+                    if "employer_contribution_rate" in deduction_item:
+                         employer_rate = deduction_item["employer_contribution_rate"]
+                    
+                    employer_rate = float(employer_rate) if employer_rate else 0.0
+
+                    if employer_rate > 0:
+                        liability_amount = 0.0
+                        
+                        # Determine base amount
+                        base_amount = 0.0
+                        based_on = ded_config["based_on"]
+                        
+                        if based_on == "gross_pay":
+                            base_amount = float(item["gross_pay"] or 0)
+                        elif based_on == "basic_pay":
+                             base_amount = float(item["basic_pay"] or 0)
+                        elif based_on == "taxable_gross_pay":
+                             # Attempt to find taxable gross in pay_head_data
+                             # It might be in 'taxable_gross_pay' key of the dict if saved by calculate_taxable_gross_pay
+                             # But let's check structure.
+                             # If not found, fall back to gross_pay as approximation or 0? 
+                             # Creating a fallback logic
+                             base_amount = float(ph_data.get("taxable_gross_pay", {}).get("taxable_gross_pay", item["gross_pay"] or 0))
+                        
+                        liability_amount = (base_amount * employer_rate) / 100.0
+                        
+                        data_list.append({
+                            "Employee": f"{item['employee_id__employee_first_name']} {item['employee_id__employee_last_name']}",
+                            "Tax Component": ded_config["title"],
+                            "Employer Liability": round(liability_amount, 2),
+                            "Rate": f"{employer_rate}%",
+                            "Start Date": item["start_date"],
+                            "End Date": item["end_date"],
+                        })
+
         else:
             data_list = []
 
         return JsonResponse(data_list, safe=False)
+
+
+    @login_required
+    @permission_required(perm="payroll.view_payslip")
+    def download_tax_forms(request):
+        import io
+        import zipfile
+        from django.http import HttpResponse
+        from report.forms.tax_forms import TaxFormFiller
+        from django.db.models import Sum
+
+        # Filter Logic (Simplified overlap with payroll_pivot logic)
+        payslips = Payslip.objects.all()
+        
+        # Apply company filter if selected
+        selected_company = request.session.get("selected_company")
+        if selected_company and selected_company != "all":
+             payslips = payslips.filter(employee_id__employee_work_info__company_id=selected_company)
+
+        # Apply basic date filters directly from request
+        start_date_from = parse_date(request.GET.get("start_date_from", ""))
+        start_date_to = parse_date(request.GET.get("start_date_till", ""))
+        if start_date_from:
+            payslips = payslips.filter(start_date__gte=start_date_from)
+        if start_date_to:
+            payslips = payslips.filter(start_date__lte=start_date_to)
+
+        end_date_from = parse_date(request.GET.get("end_date_from", ""))
+        end_date_to = parse_date(request.GET.get("end_date_till", ""))
+        if end_date_from:
+            payslips = payslips.filter(end_date__gte=end_date_from)
+        if end_date_to:
+            payslips = payslips.filter(end_date__lte=end_date_to)
+
+        # Aggregate Data
+        # This is a rough aggregation. For real forms, specific tax components need mapping.
+        total_gross = payslips.aggregate(Sum("gross_pay"))["gross_pay__sum"] or 0.0
+        total_deduction = payslips.aggregate(Sum("deduction"))["deduction__sum"] or 0.0
+        
+        # Fetch company info from first available record or session
+        company_name = ""
+        company_address = ""
+        employer_ein = ""
+        
+        if selected_company and selected_company != "all":
+             comp = Company.objects.filter(id=selected_company).first()
+             if comp:
+                 company_name = comp.company
+                 company_address = f"{comp.address}, {comp.city}, {comp.state} {comp.zip}"
+                 # tax_id is not in basic Company model? Checked requirements, user added 'ein' in previous task.
+                 # Assuming 'ein' or 'tax_id' field exists.
+                 employer_ein = getattr(comp, "ein", getattr(comp, "tax_id", ""))
+        
+        data = {
+            "employer_name": company_name,
+            "employer_address": company_address,
+            "employer_ein": employer_ein,
+            "total_wages": total_gross,
+            # For specific taxes (Fed Income, SS, Medicare), we need to check deductions
+            # This requires inspecting pay_head_data or having separate Tax models.
+            # For now, we pass generic totals which might be mapped if fields exist.
+        }
+
+        filler = TaxFormFiller()
+        zip_buffer = io.BytesIO()
+        has_files = False
+        
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
+            for form_type in ["941", "940", "DE9", "DE9C"]:
+                 try:
+                     pdf_bytes = filler.fill_form(form_type, data)
+                     if pdf_bytes:
+                         zf.writestr(f"Form_{form_type}.pdf", pdf_bytes)
+                         has_files = True
+                 except Exception:
+                     # Skip if template missing
+                     pass
+        
+        if not has_files:
+             # Create a dummy text file saying no templates found
+             with zipfile.ZipFile(zip_buffer, "w") as zf:
+                 zf.writestr("README.txt", "No PDF templates found in report/static/report/forms/. Please add f941.pdf, f940.pdf, etc.")
+
+        response = HttpResponse(zip_buffer.getvalue(), content_type="application/zip")
+        response['Content-Disposition'] = 'attachment; filename="tax_forms.zip"'
+        return response

@@ -64,6 +64,11 @@ if apps.is_installed("payroll"):
                 "payroll-report", payroll_report.payroll_report, name="payroll-report"
             ),
             path("payroll-pivot", payroll_report.payroll_pivot, name="payroll-pivot"),
+            path(
+                "download-tax-forms", 
+                payroll_report.download_tax_forms, 
+                name="download-tax-forms"
+            ),
         ]
     )
 
