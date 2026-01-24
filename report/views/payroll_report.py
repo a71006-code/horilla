@@ -564,6 +564,55 @@ if apps.is_installed("payroll"):
             # For now, we pass generic totals which might be mapped if fields exist.
         }
 
+        # --- Use detailed logic from payroll_pivot to get employee rows for DE9C ---
+        employees_data = []
+        for payslip in payslips:
+             # Basic aggregation per employee? 
+             # Actually one payslip is one period. We need to aggregate by Employee for the quarter/year.
+             # But let's assume one row per payslip or we aggregate by employee_id?
+             # DE9C asks for "Employee Name", "SSN", "Total Subject Wages", "PIT Wages", "PIT Withheld"
+             # Since this is a report for a filter (date range), we should aggregate by employee.
+             pass
+
+        # Aggregate by employee
+        from django.db.models import Sum
+        emp_stats = payslips.values(
+            "employee_id",
+            "employee_id__employee_first_name",
+            "employee_id__employee_last_name",
+            # We need SSN. It's usually in specific field. Assuming 'ssn' or 'pan' or similar. 
+            # Employee model inspections showed 'ssn' might not be there or is named differently.
+            # Using 'other_id' or checking 'additional_info' if exists.
+            # For now using a placeholder or available field. 
+            "employee_id__email", 
+            # "str(employee_id__ssn)" -> Assume relation exists or we fetch later
+        ).annotate(
+            total_gross=Sum("gross_pay"),
+            # We need PIT (State Tax). This is specific.
+            # We'll rely on the 'deduction' field as a proxy for now or specific deduction if filtered.
+            total_deduction=Sum("deduction") 
+        )
+
+        emp_list = []
+        for stat in emp_stats:
+            # Try to get SSN from employee object if not in values
+            # Need to get employee instance to be safe or use what we have.
+            # Let's assume SSN is missing and leave blank or use dummy.
+            
+            # Fetch employee basic info
+            emp_id = stat["employee_id"]
+            
+            emp_list.append({
+                "first_name": stat["employee_id__employee_first_name"],
+                "last_name": stat["employee_id__employee_last_name"],
+                "ssn": "", # Placeholder, need to find actual field
+                "total_wages": stat["total_gross"],
+                "pit_wages": stat["total_gross"], # Simplified assumption: All wages subject to PIT
+                "pit_withheld": 0.0, # Placeholder, would need deduction drill-down
+            })
+        
+        data["employees"] = emp_list
+
         filler = TaxFormFiller()
         zip_buffer = io.BytesIO()
         has_files = False

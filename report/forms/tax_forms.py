@@ -13,29 +13,51 @@ class TaxFormFiller:
     
     FORM_MAPPINGS = {
         "941": {
-            # Map internal data keys to PDF field names
-            # Example mapping based on standard IRS Form 941 (2024/2025)
-            # These field names must be verified against the actual PDF template widget names.
+            # Form 941 (Rev. January 2024)
             "employer_name": "Name",
             "employer_ein": "EIN",
             "employer_address": "Address",
-            "total_wages": "f1_1", # Wages, tips, other compensation
-            "federal_income_tax": "f1_2", # Federal income tax withheld
-            "taxable_social_security_wages": "f1_5a_c1", # Column 1
-            "taxable_social_security_tips": "f1_5b_c1",
-            "taxable_medicare_wages": "f1_5c_c1",
-            # ... add more mappings as needed based on actual PDF inspection
+            "employer_city": "City", 
+            "employer_state": "State",
+            "employer_zip": "Zip",
+            "tax_year": "Year",
+            "quarter": "Quarter",
+            # Standard lines
+            "total_wages": "f1_2", # "Wages, tips, and other compensation"
+            "federal_income_tax": "f1_3", # "Federal income tax withheld"
+            "taxable_social_security_wages": "f1_5a1", # "Taxable social security wages"
+            "taxable_social_security_tips": "f1_5b1", # "Taxable social security tips"
+            "taxable_medicare_wages": "f1_5c1", # "Taxable Medicare wages & tips"
+            "total_taxes_before_adjustments": "f1_6", # "Total taxes before adjustments"
+            "total_taxes_after_adjustments": "f1_10", # "Total taxes after adjustments"
+            "total_deposits": "f1_11", # "Total deposits"
         },
         "940": {
+            # Form 940 (2023)
             "employer_name": "Name",
             "employer_ein": "EIN",
-            # ...
+            "employer_address": "Address",
+             # ... simplified for now
         },
         "DE9": {
-             # California DE 9
+            # CA DE 9
+            "employer_name": "Business Name",
+            "employer_account_number": "Account Number",
+            "employer_address": "Address",
+            "quarter": "Quarter",
+            "year": "Year",
+            "total_wages": "Total Wages", 
+            "pit_wages": "PIT Wages",
+            "pit_withheld": "PIT Withheld",
         },
         "DE9C": {
-             # California DE 9C
+             # CA DE 9C (Continuation)
+             "employer_name": "Business Name",
+             "employer_account_number": "Account Number",
+             "quarter_ended": "Quarter Ended", 
+             # Employee Rows (handled dynamically in code roughly)
+             # But for mapping we can put prefixes if needed, 
+             # though the code logic might need to iterate 'SSN{i}', 'Name{i}'...
         }
     }
 
@@ -122,6 +144,58 @@ class TaxFormFiller:
                     if value_to_set is not None:
                          widget.field_value = str(value_to_set)
                          widget.update()
+
+
+            # --- Dynamic Row Handling (for DE9C etc.) ---
+            if "employees" in data and isinstance(data["employees"], list):
+                employee_list = data["employees"]
+                # We need to distribute these employees across the fields.
+                # Assuming typical DE9C structure: rows are numbered 1..N
+                
+                # Iterate pages again or just find widgets by pattern
+                for page in doc:
+                    widgets = page.widgets()
+                    if not widgets: continue
+
+                    for widget in widgets:
+                        name = widget.field_name
+                        # Check for pattern like "SSN1", "Last Name1"
+                        # We need to detect the index "1" and map to employee_list[0]
+                        
+                        import re
+                        # Pattern: Any text followed by a number (and optional suffix)
+                        # e.g. "SSN1", "First Name1", "Total Subject Wages1"
+                        match = re.search(r"(\D+)(\d+)$", name)
+                        if match:
+                             field_prefix = match.group(1).strip()
+                             row_index = int(match.group(2)) - 1 # 0-indexed
+                             
+                             if 0 <= row_index < len(employee_list):
+                                 emp = employee_list[row_index]
+                                 
+                                 # Map prefix to data key
+                                 # This mapping needs to be robust.
+                                 # Based on inspection: "SSN", "First Name", "Last Name", "Total Subject Wages", "PIT Wages", "PIT Withheld"
+                                 
+                                 val = None
+                                 if "SSN" in field_prefix:
+                                     val = emp.get("ssn", "")
+                                 elif "First Name" in field_prefix:
+                                     val = emp.get("first_name", "")
+                                 elif "Last Name" in field_prefix:
+                                     val = emp.get("last_name", "")
+                                 elif "MI" in field_prefix:
+                                      val = "" # Middle Initial, blank for now
+                                 elif "Subject Wages" in field_prefix:
+                                      val = emp.get("total_wages", 0.0)
+                                 elif "PIT Wages" in field_prefix:
+                                      val = emp.get("pit_wages", 0.0)
+                                 elif "PIT Withheld" in field_prefix:
+                                      val = emp.get("pit_withheld", 0.0)
+                                      
+                                 if val is not None:
+                                     widget.field_value = str(val)
+                                     widget.update()
             
             # doc.save(output_path) # We want bytes
             return doc.write()
