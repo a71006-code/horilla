@@ -383,6 +383,17 @@ if apps.is_installed("payroll"):
                         }
                     )
 
+                # Add Federal Tax as a specific Deduction
+                federal_tax_amount = round(float(pay_head_data.get("federal_tax", 0) or 0), 2)
+                if federal_tax_amount > 0:
+                    all_pay_data.append(
+                        {
+                            "Pay Type": "Deduction",
+                            "Title": "Federal Withholding",
+                            "Amount": federal_tax_amount,
+                        }
+                    )
+
                 # Add combined data to main data list
                 for pay_item in all_pay_data:
                     data_list.append(
