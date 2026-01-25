@@ -262,6 +262,7 @@
         <option value="payslip">Payslip</option>
         <option value="allowance">Allowance & Deduction</option>
         <option value="employer_liability">Employer Tax Liability</option>
+        <option value="cash_requirement">Cash Requirement</option>
     </select>
 
     <!-- Download PDF Button -->
@@ -275,6 +276,7 @@
         <div id="pivot-payslip" class="pivot-wrapper" style="display:none;width: 100%; overflow-x: auto;"></div>
         <div id="pivot-allowance" class="pivot-wrapper" style="display:none;width: 100%; overflow-x: auto;"></div>
         <div id="pivot-liability" class="pivot-wrapper" style="display:none;width: 100%; overflow-x: auto;"></div>
+        <div id="pivot-cash" class="pivot-wrapper" style="display:none;width: 100%; overflow-x: auto;"></div>
     </div>
 </div>
 
@@ -295,14 +297,18 @@
 
             if (model === "payslip") {
                 containerId = "pivot-payslip";
-                rowsConfig = ["Employee", "Basic Salary", "Gross Pay", "Net Pay", "Status"];
+                // Enhanced Payroll Register View
+                rowsConfig = ["Employee", "Basic Salary", "Allowance Title", "Allowance Amount", "Total Allowance Amount", "Gross Pay", "Deduction Title", "Deduction Amount", "Total Deductions", "Net Pay"];
             } else if (model === "allowance") {
                 containerId = "pivot-allowance";
                 rowsConfig = ["Employee", "Allowance & Deduction", "Allowance & Deduction Title", "Allowance & Deduction Amount"];
             } else if (model === "employer_liability") {
                 containerId = "pivot-liability";
-                rowsConfig = ["Employee", "Tax Component", "Employer Liability", "Rate"];
+                rowsConfig = ["Employee", "Tax Component", "Employer Liability", "Employee Withheld", "Rate"];
                 $("#download-tax-forms-btn").show();
+            } else if (model === "cash_requirement") {
+                containerId = "pivot-cash";
+                rowsConfig = ["Category", "Payee", "Amount"];
             }
 
             // Show relevant container
@@ -310,6 +316,44 @@
 
 
             $.getJSON(url, function (data) {
+                // DYNAMIC COLUMN DETECTION
+                // If model is "payslip", scan the data to find all columns starting with "Allowance -" or "Deduction -"
+                if (model === "payslip" && data.length > 0) {
+                    let dynamicCols = [];
+                    // We check the first few records to find all possible keys (in case some rows don't have all deductions)
+                    // Actually better to check all, but for perf let's just use the first record or manage via keys
+                    let allKeys = new Set();
+                    data.forEach(row => {
+                        Object.keys(row).forEach(key => {
+                            if (key.startsWith("Allowance - ") || key.startsWith("Deduction - ")) {
+                                allKeys.add(key);
+                            }
+                        });
+                    });
+
+                    // Sort keys to look nice (allowances first, then deductions)
+                    let sortedKeys = Array.from(allKeys).sort();
+
+                    // Insert these dynamic columns into rowsConfig before "Gross Pay" or after "Basic Salary"
+                    // Current config: ["Employee", "Basic Salary", "Allowance Title", "Allowance Amount", "Total Allowance Amount", "Gross Pay", "Deduction Title", "Deduction Amount", "Total Deduction Amount", "Net Pay"]
+                    // We want: Employee, Basic Salary, [Dynamic Allowances], Gross Pay, [Dynamic Deductions], Net Pay
+
+                    // Let's rebuild rowsConfig for matrix view
+                    rowsConfig = ["Employee", "Basic Salary"];
+
+                    // Add Allowances
+                    sortedKeys.filter(k => k.startsWith("Allowance - ")).forEach(k => rowsConfig.push(k));
+
+                    rowsConfig.push("Total Allowance Amount");
+                    rowsConfig.push("Gross Pay");
+
+                    // Add Deductions
+                    sortedKeys.filter(k => k.startsWith("Deduction - ")).forEach(k => rowsConfig.push(k));
+
+                    rowsConfig.push("Total Deductions");
+                    rowsConfig.push("Net Pay");
+                }
+
                 // Add Plotly renderers correctly
                 let plotlyRenderers = $.pivotUtilities.plotly_renderers;
 
@@ -341,7 +385,8 @@
                         }
 
                         // ✅ Hide fields from the dropdown but keep them visible in the table
-                        let hiddenFields = ["Allowance Amount", "Deduction Amount"];
+                        // We might want to hide the "Title" and "Amount" raw string columns if using matrix view to avoid clutter
+                        let hiddenFields = ["Allowance Title", "Allowance Amount", "Deduction Title", "Deduction Amount"];
 
                         setTimeout(function () {
                             $(".pvtAttrDropdown option").each(function () {
@@ -364,15 +409,41 @@
 
                     if (model === "payslip") {
                         containerId = "pivot-payslip";
-                        rowsConfig = ["Employee", "Basic Salary", "Gross Pay", "Net Pay", "Status"];
+                        rowsConfig = ["Employee", "Basic Salary", "Allowance Title", "Allowance Amount", "Total Allowance Amount", "Gross Pay", "Deduction Title", "Deduction Amount", "Total Deduction Amount", "Net Pay"];
                     } else if (model === "allowance") {
                         containerId = "pivot-allowance";
                         rowsConfig = ["Employee", "Allowance & Deduction", "Allowance & Deduction Title", "Allowance & Deduction Amount"];
+                    } else if (model === "employer_liability") {
+                        containerId = "pivot-liability";
+                        rowsConfig = ["Employee", "Tax Component", "Employer Liability", "Employee Withheld", "Rate"];
+                    } else if (model === "cash_requirement") {
+                        containerId = "pivot-cash";
+                        rowsConfig = ["Category", "Payee", "Amount"];
                     }
 
                     $("#" + containerId).show();
 
                     $.getJSON(`payroll-pivot?model=${selectedModel}&${formData}`, function (data) {
+
+                        // DYNAMIC COLUMN DETECTION (Replicated for Filtered View)
+                        if (model === "payslip" && data.length > 0) {
+                            let allKeys = new Set();
+                            data.forEach(row => {
+                                Object.keys(row).forEach(key => {
+                                    if (key.startsWith("Allowance - ") || key.startsWith("Deduction - ")) {
+                                        allKeys.add(key);
+                                    }
+                                });
+                            });
+                            let sortedKeys = Array.from(allKeys).sort();
+                            rowsConfig = ["Employee", "Basic Salary"];
+                            sortedKeys.filter(k => k.startsWith("Allowance - ")).forEach(k => rowsConfig.push(k));
+                            rowsConfig.push("Total Allowance Amount");
+                            rowsConfig.push("Gross Pay");
+                            sortedKeys.filter(k => k.startsWith("Deduction - ")).forEach(k => rowsConfig.push(k));
+                            rowsConfig.push("Total Deduction Amount");
+                            rowsConfig.push("Net Pay");
+                        }
 
                         const plotlyRenderers = $.pivotUtilities.plotly_renderers;
 

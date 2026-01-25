@@ -143,12 +143,16 @@ if apps.is_installed("payroll"):
                 allowances = pay_head_data.get("allowances", [])
                 deductions = pay_head_data.get(
                     "pretax_deductions", []
-                ) + pay_head_data.get("post_tax_deductions", [])
+                ) + pay_head_data.get("post_tax_deductions", []) + pay_head_data.get("tax_deductions", [])
 
                 # Prepare allowance and deduction lists with properly rounded amounts
+                # Format: "Title (Amount)" for better readability
                 allowance_titles = (
-                    ", ".join([allowance["title"] for allowance in allowances]) or "-"
+                    ", ".join([f"{allowance['title']} ({round(float(allowance['amount'] or 0), 2)})" for allowance in allowances]) or "-"
                 )
+                
+                # We keep the raw amount lists for the separate columns if needed, 
+                # but valid CSV export often benefits from the paired string.
                 allowance_amounts = (
                     ", ".join(
                         [
@@ -160,8 +164,9 @@ if apps.is_installed("payroll"):
                 )
 
                 deduction_titles = (
-                    ", ".join([deduction["title"] for deduction in deductions]) or "-"
+                    ", ".join([f"{deduction['title']} ({round(float(deduction['amount'] or 0), 2)})" for deduction in deductions]) or "-"
                 )
+                
                 deduction_amounts = (
                     ", ".join(
                         [
@@ -187,10 +192,14 @@ if apps.is_installed("payroll"):
                         for deduction in deductions
                     ]
                 )
+                
+                # Add Federal Tax to Total Deductions
+                # It is stored as a direct key in pay_head_data
+                federal_tax_amount = round(float(pay_head_data.get("federal_tax", 0) or 0), 2)
+                total_deduction_amount += federal_tax_amount
 
                 # Main data structure
-                data_list.append(
-                    {
+                row_data = {
                         "Employee": f"{item['employee_id__employee_first_name']} {item['employee_id__employee_last_name']}",
                         "Gender": choice_gender.get(item["employee_id__gender"]),
                         "Email": item["employee_id__email"],
@@ -254,14 +263,21 @@ if apps.is_installed("payroll"):
                         "Batch Name": item["group_name"] if item["group_name"] else "-",
                         "Contract Wage": round(float(item["contract_wage"] or 0), 2),
                         "Basic Salary": round(float(item["basic_pay"] or 0), 2),
-                        "Gross Pay": round(float(item["gross_pay"] or 0), 2),
-                        "Net Pay": round(float(item["net_pay"] or 0), 2),
+                        
+                        # Consolidated columns (Optional, kept for backward compat or summary)
                         "Allowance Title": allowance_titles,
-                        "Allowance Amount": allowance_amounts,
+                        "Allowance Amount": allowance_amounts, 
                         "Total Allowance Amount": round(total_allowance_amount, 2),
+                        
+                        "Gross Pay": round(float(item["gross_pay"] or 0), 2),
+                        
                         "Deduction Title": deduction_titles,
                         "Deduction Amount": deduction_amounts,
-                        "Total Deduction Amount": round(total_deduction_amount, 2),
+                        "Total Deductions": round(total_deduction_amount, 2),
+                        
+                        # Net Pay should be Gross - Total Deductions
+                        # We use the calculated totals to ensure math adds up visually
+                        "Net Pay": round(float(item["gross_pay"] or 0) - total_deduction_amount, 2),
                         "Status": STATUS.get(item["status"]),
                         "Experience": round(
                             float(
@@ -269,8 +285,26 @@ if apps.is_installed("payroll"):
                             ),
                             2,
                         ),
-                    }
-                )
+                }
+
+                # --- FLATTEN DYNAMIC COLUMNS ---
+                # Add each Allowance as a separate column
+                for allowance in allowances:
+                    col_name = f"Allowance - {allowance['title']}"
+                    row_data[col_name] = round(float(allowance["amount"] or 0), 2)
+
+                # Add each Deduction as a separate column
+                for deduction in deductions:
+                    col_name = f"Deduction - {deduction['title']}"
+                    row_data[col_name] = round(float(deduction["amount"] or 0), 2)
+
+                # Add Federal Tax as a specific Deduction column
+                # It is stored as a direct key in pay_head_data, not in the deductions list
+                federal_tax_amount = round(float(pay_head_data.get("federal_tax", 0) or 0), 2)
+                if federal_tax_amount > 0:
+                    row_data["Deduction - Federal Withholding"] = federal_tax_amount
+
+                data_list.append(row_data)
 
         elif model_type == "allowance":
 
@@ -340,7 +374,7 @@ if apps.is_installed("payroll"):
                 # Add Deductions to combined data
                 for deduction in pay_head_data.get(
                     "pretax_deductions", []
-                ) + pay_head_data.get("post_tax_deductions", []):
+                ) + pay_head_data.get("post_tax_deductions", []) + pay_head_data.get("tax_deductions", []):
                     all_pay_data.append(
                         {
                             "Pay Type": "Deduction",
@@ -466,36 +500,137 @@ if apps.is_installed("payroll"):
                          employer_rate = deduction_item["employer_contribution_rate"]
                     
                     employer_rate = float(employer_rate) if employer_rate else 0.0
+                    
+                    # Capture Employee Withheld Amount
+                    employee_withheld = float(deduction_item.get("amount") or 0.0)
 
-                    if employer_rate > 0:
+                    # Show row if EITHER Employer OR Employee has an amount
+                    # Previously we only checked if employer_rate > 0
+                    if employer_rate > 0 or employee_withheld > 0:
                         liability_amount = 0.0
                         
-                        # Determine base amount
-                        base_amount = 0.0
-                        based_on = ded_config["based_on"]
-                        
-                        if based_on == "gross_pay":
-                            base_amount = float(item["gross_pay"] or 0)
-                        elif based_on == "basic_pay":
-                             base_amount = float(item["basic_pay"] or 0)
-                        elif based_on == "taxable_gross_pay":
-                             # Attempt to find taxable gross in pay_head_data
-                             # It might be in 'taxable_gross_pay' key of the dict if saved by calculate_taxable_gross_pay
-                             # But let's check structure.
-                             # If not found, fall back to gross_pay as approximation or 0? 
-                             # Creating a fallback logic
-                             base_amount = float(ph_data.get("taxable_gross_pay", {}).get("taxable_gross_pay", item["gross_pay"] or 0))
-                        
-                        liability_amount = (base_amount * employer_rate) / 100.0
+                        # Calculate Employer Liability if applicable
+                        if employer_rate > 0:
+                            # Determine base amount
+                            base_amount = 0.0
+                            based_on = ded_config["based_on"]
+                            
+                            if based_on == "gross_pay":
+                                base_amount = float(item["gross_pay"] or 0)
+                            elif based_on == "basic_pay":
+                                 base_amount = float(item["basic_pay"] or 0)
+                            elif based_on == "taxable_gross_pay":
+                                 base_amount = float(ph_data.get("taxable_gross_pay", {}).get("taxable_gross_pay", item["gross_pay"] or 0))
+                            
+                            liability_amount = (base_amount * employer_rate) / 100.0
                         
                         data_list.append({
                             "Employee": f"{item['employee_id__employee_first_name']} {item['employee_id__employee_last_name']}",
                             "Tax Component": ded_config["title"],
                             "Employer Liability": round(liability_amount, 2),
-                            "Rate": f"{employer_rate}%",
+                            "Employee Withheld": round(employee_withheld, 2),
+                            "Rate": f"{employer_rate}%" if employer_rate > 0 else "-",
                             "Start Date": item["start_date"],
                             "End Date": item["end_date"],
                         })
+
+        elif model_type == "cash_requirement":
+            from django.db.models import Sum
+            
+            payslips = Payslip.objects.all()
+            payslip_filter = PayslipFilter(request.GET, queryset=payslips)
+            filtered_qs = payslip_filter.qs
+            
+            # 1. Net Pay (Transfer to Employees)
+            total_net_pay = filtered_qs.aggregate(Sum("net_pay"))["net_pay__sum"] or 0.0
+            
+            # 2. Taxes (Transfer to IRS/State)
+            # We need to sum (Employer Liability + Employee Withheld)
+            # Iterate to calculate exact tax liability
+            total_tax_liability = 0.0
+            total_benefit_liability = 0.0
+
+            # Using a simplified iteration similar to employer_liability reporting
+            # but aggregating totals instead of per-employee list
+            
+            # We need to inspect deductions to separate Taxes vs Benefits if possible.
+            # Currently 'tax_deductions' are usually separated in pay_head_data structure.
+            # Or we look at DeductionConfig.title / type if available.
+            
+            # Let's fetch all relevant data
+            data = list(filtered_qs.values("id", "gross_pay", "basic_pay"))
+            payslip_ids = [item["id"] for item in data]
+            pay_head_data_dict = dict(
+                Payslip.objects.filter(id__in=payslip_ids).values_list("id", "pay_head_data")
+            )
+            
+            from payroll.models.models import Deduction
+            all_deduction_ids = set()
+            for ph_data in pay_head_data_dict.values():
+                 # Look at all deduction types
+                 deductions = ph_data.get("pretax_deductions", []) + ph_data.get("post_tax_deductions", []) + ph_data.get("tax_deductions", [])
+                 for d in deductions:
+                     all_deduction_ids.add(d["deduction_id"])
+            
+            deduction_map = {
+                d["id"]: d for d in Deduction.objects.filter(id__in=all_deduction_ids).values("id", "title", "employer_rate", "based_on")
+            }
+            
+            for item in data:
+                ph_data = pay_head_data_dict.get(item["id"], {})
+                # Aggregate Taxes
+                for d in ph_data.get("tax_deductions", []):
+                    # For tax_deductions list, it's usually statutory taxes
+                    amount = float(d.get("amount", 0)) # Employee share
+                    
+                    # Calculate Employer share
+                    ded_config = deduction_map.get(d["deduction_id"])
+                    employer_share = 0.0
+                    if ded_config:
+                        rate = float(ded_config["employer_rate"]) if ded_config["employer_rate"] else 0.0
+                        if "employer_contribution_rate" in d:
+                             rate = float(d["employer_contribution_rate"])
+                        
+                        if rate > 0:
+                            base = 0.0
+                            if ded_config["based_on"] == "gross_pay": base = float(item["gross_pay"] or 0)
+                            elif ded_config["based_on"] == "basic_pay": base = float(item["basic_pay"] or 0)
+                            elif ded_config["based_on"] == "taxable_gross_pay": 
+                                base = float(ph_data.get("taxable_gross_pay", {}).get("taxable_gross_pay", item["gross_pay"] or 0))
+                            
+                            employer_share = (base * rate) / 100.0
+                    
+                    total_tax_liability += (amount + employer_share)
+
+                # Aggregate Other Deductions (Benefits)
+                # Assuming pretax/posttax are non-statutory benefits/insurance
+                for d in ph_data.get("pretax_deductions", []) + ph_data.get("post_tax_deductions", []):
+                     amount = float(d.get("amount", 0))
+                     # Add employer share if any? (Complex benefit logic might be here, ignoring for basic cash req)
+                     total_benefit_liability += amount
+
+            data_list = [
+                {
+                    "Category": "Net Pay",
+                    "Payee": "Employees",
+                    "Amount": round(total_net_pay, 2)
+                },
+                {
+                    "Category": "Taxes",
+                    "Payee": "Federal/State Agencies",
+                    "Amount": round(total_tax_liability, 2)
+                },
+                {
+                    "Category": "Deductions/Benefits",
+                    "Payee": "Benefit Vendors",
+                    "Amount": round(total_benefit_liability, 2)
+                },
+                {
+                    "Category": "TOTAL CASH REQUIRED",
+                    "Payee": "-",
+                    "Amount": round(total_net_pay + total_tax_liability + total_benefit_liability, 2)
+                }
+            ]
 
         else:
             data_list = []
