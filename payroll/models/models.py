@@ -1289,7 +1289,8 @@ class Deduction(HorillaModel):
             if self.based_on == "ca_state_tax":
                  self.is_tax = True
                  self.is_pretax = False
-            elif not self.rate:
+            # Allow 0% employee rate if employer_rate is set (for employer-only taxes like FUTA)
+            elif not self.rate and not self.employer_rate:
                 raise ValidationError(
                     _(
                         "Employee rate must be specified for deductions that are not fixed amount"
@@ -1345,6 +1346,28 @@ class Deduction(HorillaModel):
             self.field = None
             self.condition = None
             self.value = None
+
+    HISTORY_TRACKING = True
+
+    TAX_REPORTING_CHOICES = [
+        ("FIT", _("Federal Income Tax")),
+        ("FICA_SS", _("Social Security Tax")),
+        ("FICA_MED", _("Medicare Tax")),
+        ("FUTA", _("Federal Unemployment Tax (FUTA)")),
+        ("CA_PIT", _("CA Personal Income Tax")),
+        ("CA_SDI", _("CA State Disability Insurance")),
+        ("CA_ETT", _("CA Employment Training Tax")),
+        ("CA_UI", _("CA Unemployment Insurance")),
+    ]
+
+    tax_reporting_type = models.CharField(
+        max_length=20,
+        choices=TAX_REPORTING_CHOICES,
+        null=True,
+        blank=True,
+        verbose_name=_("Tax Reporting Type"),
+        help_text=_("Explicitly map this deduction to a tax line on forms (941/940/DE9)"),
+    )
 
     def __str__(self) -> str:
         return str(self.title)

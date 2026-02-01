@@ -654,6 +654,7 @@ class PayslipDeductionForm(ModelForm):
             "employer_rate",
             "has_max_limit",
             "maximum_amount",
+            "tax_reporting_type",
         ]
         widgets = {
             "one_time_date": forms.HiddenInput(),

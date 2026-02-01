@@ -457,93 +457,15 @@ if apps.is_installed("payroll"):
                     )
 
         elif model_type == "employer_liability":
-            from payroll.models.models import Deduction
+            from payroll.methods.tax_reporting import calculate_tax_liability
             
             payslips = Payslip.objects.all()
             payslip_filter = PayslipFilter(request.GET, queryset=payslips)
             filtered_qs = payslip_filter.qs
 
-            data = list(
-                filtered_qs.values(
-                    "id",
-                    "employee_id__employee_first_name",
-                    "employee_id__employee_last_name",
-                    "start_date",
-                    "end_date",
-                    "basic_pay",
-                    "gross_pay",
-                    "status",
-                )
-            )
-
-            payslip_ids = [item["id"] for item in data]
-            pay_head_data_dict = dict(
-                Payslip.objects.filter(id__in=payslip_ids).values_list(
-                    "id", "pay_head_data"
-                )
-            )
-
-            # Collect all deduction IDs to fetch configuration
-            all_deduction_ids = set()
-            for ph_data in pay_head_data_dict.values():
-                deductions = ph_data.get("pretax_deductions", []) + ph_data.get("post_tax_deductions", []) + ph_data.get("tax_deductions", [])
-                for d in deductions:
-                    all_deduction_ids.add(d["deduction_id"])
-
-            deduction_map = {
-                d["id"]: d for d in Deduction.objects.filter(id__in=all_deduction_ids).values("id", "title", "employer_rate", "based_on")
-            }
-
-            data_list = []
-            for item in data:
-                ph_data = pay_head_data_dict.get(item["id"], {})
-                deductions = ph_data.get("pretax_deductions", []) + ph_data.get("post_tax_deductions", []) + ph_data.get("tax_deductions", [])
-
-                for deduction_item in deductions:
-                    ded_id = deduction_item["deduction_id"]
-                    ded_config = deduction_map.get(ded_id)
-                    
-                    if not ded_config:
-                        continue
-
-                    employer_rate = ded_config["employer_rate"]
-                    if "employer_contribution_rate" in deduction_item:
-                         employer_rate = deduction_item["employer_contribution_rate"]
-                    
-                    employer_rate = float(employer_rate) if employer_rate else 0.0
-                    
-                    # Capture Employee Withheld Amount
-                    employee_withheld = float(deduction_item.get("amount") or 0.0)
-
-                    # Show row if EITHER Employer OR Employee has an amount
-                    # Previously we only checked if employer_rate > 0
-                    if employer_rate > 0 or employee_withheld > 0:
-                        liability_amount = 0.0
-                        
-                        # Calculate Employer Liability if applicable
-                        if employer_rate > 0:
-                            # Determine base amount
-                            base_amount = 0.0
-                            based_on = ded_config["based_on"]
-                            
-                            if based_on == "gross_pay":
-                                base_amount = float(item["gross_pay"] or 0)
-                            elif based_on == "basic_pay":
-                                 base_amount = float(item["basic_pay"] or 0)
-                            elif based_on == "taxable_gross_pay":
-                                 base_amount = float(ph_data.get("taxable_gross_pay", {}).get("taxable_gross_pay", item["gross_pay"] or 0))
-                            
-                            liability_amount = (base_amount * employer_rate) / 100.0
-                        
-                        data_list.append({
-                            "Employee": f"{item['employee_id__employee_first_name']} {item['employee_id__employee_last_name']}",
-                            "Tax Component": ded_config["title"],
-                            "Employer Liability": round(liability_amount, 2),
-                            "Employee Withheld": round(employee_withheld, 2),
-                            "Rate": f"{employer_rate}%" if employer_rate > 0 else "-",
-                            "Start Date": item["start_date"],
-                            "End Date": item["end_date"],
-                        })
+            # Use Unified Tax Logic
+            result = calculate_tax_liability(filtered_qs)
+            data_list = result["detailed_liability"]
 
         elif model_type == "cash_requirement":
             from django.db.models import Sum
@@ -681,83 +603,119 @@ if apps.is_installed("payroll"):
         if end_date_to:
             payslips = payslips.filter(end_date__lte=end_date_to)
 
-        # Aggregate Data
-        # This is a rough aggregation. For real forms, specific tax components need mapping.
-        total_gross = payslips.aggregate(Sum("gross_pay"))["gross_pay__sum"] or 0.0
-        total_deduction = payslips.aggregate(Sum("deduction"))["deduction__sum"] or 0.0
-        
-        # Fetch company info from first available record or session
-        company_name = ""
-        company_address = ""
-        employer_ein = ""
-        
+        # Retrieve Company Info
+        from base.models import Company
+        comp = None
+        company_name = "Horilla HR"
+        company_address = "123 Business Rd"
+        employer_ein = "00-0000000"
+
         if selected_company and selected_company != "all":
-             comp = Company.objects.filter(id=selected_company).first()
-             if comp:
-                 company_name = comp.company
-                 company_address = f"{comp.address}, {comp.city}, {comp.state} {comp.zip}"
-                 # tax_id is not in basic Company model? Checked requirements, user added 'ein' in previous task.
-                 # Assuming 'ein' or 'tax_id' field exists.
-                 employer_ein = getattr(comp, "ein", getattr(comp, "tax_id", ""))
+            comp = Company.objects.filter(id=selected_company).first()
         
+        if not comp:
+             # Fallback to first company if exists, or defaults
+             comp = Company.objects.first()
+        
+        if comp:
+            company_name = comp.company
+            # Construct address if available
+            addr_parts = [comp.address, comp.city, comp.state, comp.zip, comp.country]
+            company_address = ", ".join([p for p in addr_parts if p])
+            # Assuming EIN might be in a field or just default for now as it's not standard on Company model usually?
+            # We'll check if there's a field for tax id, otherwise leave blank
+            employer_ein = getattr(comp, "company_registration_number", "00-0000000")
+
+        # Aggregate Data using Unified Logic
+        from payroll.methods.tax_reporting import calculate_tax_liability
+        
+        # Calculate Taxes
+        # We pass the company object (comp) if available, though currently not used by calc logic
+        result = calculate_tax_liability(payslips, company=comp if selected_company and selected_company != "all" else None)
+        
+        aggregates = result["form_aggregates"]
+        
+        # Calculate Total Gross for summary
+        total_gross = payslips.aggregate(Sum("gross_pay"))["gross_pay__sum"] or 0.0
+
+        # Prepare granular address for forms that need it (e.g. 941)
+        # and combined for others
+        emp_city = getattr(comp, "city", "") if comp else ""
+        emp_state = getattr(comp, "state", "") if comp else ""
+        emp_zip = getattr(comp, "zip", "") if comp else ""
+
         data = {
             "employer_name": company_name,
             "employer_address": company_address,
+            "employer_city": emp_city,
+            "employer_state": emp_state,
+            "employer_zip": emp_zip,
             "employer_ein": employer_ein,
-            "total_wages": total_gross,
-            # For specific taxes (Fed Income, SS, Medicare), we need to check deductions
-            # This requires inspecting pay_head_data or having separate Tax models.
-            # For now, we pass generic totals which might be mapped if fields exist.
+            "employer_account_number": employer_ein, # Use EIN as State ID fallback for now if no separate field
+            "total_wages": round(total_gross, 2),
+            
+            # --- 941 Data ---
+            "federal_income_tax": round(aggregates["941"]["federal_income_tax"], 2),
+            "taxable_social_security_wages": round(aggregates["941"]["social_security_wages"], 2),
+            "taxable_medicare_wages": round(aggregates["941"]["medicare_wages"], 2),
+            "total_taxes_before_adjustments": round(
+                aggregates["941"]["federal_income_tax"] + 
+                aggregates["941"]["social_security_tax"] + 
+                aggregates["941"]["medicare_tax"], 2
+            ),
+            
+            # --- 940 Data ---
+            "total_futa_wages": round(aggregates["940"]["total_futa_wages"], 2),
+            "futa_liability": round(aggregates["940"]["futa_liability"], 2),
+            
+            # --- DE9 Data ---
+            "pit_wages": round(aggregates["DE9"]["pit_wages"], 2),
+            "pit_withheld": round(aggregates["DE9"]["pit_withheld"], 2),
+            "ui_wages": round(aggregates["DE9"]["unemployment_insurance_wages"], 2),
+            "ui_tax": round(aggregates["DE9"]["unemployment_insurance_tax"], 2),
+            "ett_wages": round(aggregates["DE9"]["ett_wages"], 2),
+            "ett_tax": round(aggregates["DE9"]["ett_tax"], 2),
+            "sdi_wages": round(aggregates["DE9"]["sdi_wages"], 2),
+            "sdi_tax": round(aggregates["DE9"]["sdi_tax"], 2),
+            
+            # --- Employee List for DE9C ---
+            "employees": [] 
         }
 
-        # --- Use detailed logic from payroll_pivot to get employee rows for DE9C ---
-        employees_data = []
-        for payslip in payslips:
-             # Basic aggregation per employee? 
-             # Actually one payslip is one period. We need to aggregate by Employee for the quarter/year.
-             # But let's assume one row per payslip or we aggregate by employee_id?
-             # DE9C asks for "Employee Name", "SSN", "Total Subject Wages", "PIT Wages", "PIT Withheld"
-             # Since this is a report for a filter (date range), we should aggregate by employee.
-             pass
-
-        # Aggregate by employee
-        from django.db.models import Sum
-        emp_stats = payslips.values(
-            "employee_id",
-            "employee_id__employee_first_name",
-            "employee_id__employee_last_name",
-            # We need SSN. It's usually in specific field. Assuming 'ssn' or 'pan' or similar. 
-            # Employee model inspections showed 'ssn' might not be there or is named differently.
-            # Using 'other_id' or checking 'additional_info' if exists.
-            # For now using a placeholder or available field. 
-            "employee_id__email", 
-            # "str(employee_id__ssn)" -> Assume relation exists or we fetch later
-        ).annotate(
-            total_gross=Sum("gross_pay"),
-            # We need PIT (State Tax). This is specific.
-            # We'll rely on the 'deduction' field as a proxy for now or specific deduction if filtered.
-            total_deduction=Sum("deduction") 
-        )
-
-        emp_list = []
-        for stat in emp_stats:
-            # Try to get SSN from employee object if not in values
-            # Need to get employee instance to be safe or use what we have.
-            # Let's assume SSN is missing and leave blank or use dummy.
-            
-            # Fetch employee basic info
-            emp_id = stat["employee_id"]
-            
-            emp_list.append({
-                "first_name": stat["employee_id__employee_first_name"],
-                "last_name": stat["employee_id__employee_last_name"],
-                "ssn": "", # Placeholder, need to find actual field
-                "total_wages": stat["total_gross"],
-                "pit_wages": stat["total_gross"], # Simplified assumption: All wages subject to PIT
-                "pit_withheld": 0.0, # Placeholder, would need deduction drill-down
-            })
+        # Populate Employee List for DE9C
+        # We need to re-iterate payslips to get per-employee totals including valid SSN and Wages
+        emp_data = {} # emp_id -> data dict
         
-        data["employees"] = emp_list
+        for payslip in payslips:
+            eid = payslip.employee_id.id
+            if eid not in emp_data:
+                emp_data[eid] = {
+                    "first_name": payslip.employee_id.employee_first_name,
+                    "last_name": payslip.employee_id.employee_last_name,
+                    "ssn": getattr(payslip.employee_id, "ssn", ""), 
+                    "total_wages": 0.0,
+                    "pit_wages": 0.0,
+                    "pit_withheld": 0.0
+                }
+            
+            gross = float(payslip.gross_pay or 0)
+            emp_data[eid]["total_wages"] += gross
+            
+            # Extract PIT from this payslip's deductions
+            ph_data = payslip.pay_head_data or {}
+            deductions = ph_data.get("pretax_deductions", []) + ph_data.get("post_tax_deductions", []) + ph_data.get("tax_deductions", [])
+            
+            pit_amt = 0.0
+            for d in deductions:
+                 # We still check title or type if available, simple fallback:
+                 if "ca tax" in d.get("title", "").lower() or "california state" in d.get("title", "").lower():
+                     pit_amt += float(d.get("amount", 0))
+            
+            emp_data[eid]["pit_withheld"] += pit_amt
+            if pit_amt > 0:
+                 emp_data[eid]["pit_wages"] += gross
+
+        data["employees"] = list(emp_data.values())
 
         filler = TaxFormFiller()
         zip_buffer = io.BytesIO()
