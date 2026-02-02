@@ -10,7 +10,7 @@ services:
     environment:
       - DEBUG=1
       - SECRET_KEY=dev-secret-key
-      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+      - ALLOWED_HOSTS=192.168.5.36,127.0.0.1,0.0.0.0
       - CSRF_TRUSTED_ORIGINS=http://localhost:8000
       - DATABASE_URL=postgres://horilla_user:horilla_pass@db:5432/horilla_db
       - REDIS_URL=redis://:horilla_pass@redis:6379/0
