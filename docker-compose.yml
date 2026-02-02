@@ -4,9 +4,9 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - .:/app
-      - staticfiles:/app/staticfiles
-      - media:/app/media
+      - /volume1/docker/horilla2:/app
+      - /volume1/docker/horilla2/staticfiles:/app/staticfiles
+      - /volume1/docker/horilla2/media:/app/media
     environment:
       - DEBUG=1
       - SECRET_KEY=dev-secret-key
@@ -27,7 +27,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "65432:5432"
 
   redis:
     image: redis:7-alpine
