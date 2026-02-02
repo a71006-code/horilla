@@ -17,7 +17,8 @@ services:
     depends_on:
       - db
       - redis
-
+    user: 1026:100
+    
   db:
     image: postgres:16-alpine
     environment:
