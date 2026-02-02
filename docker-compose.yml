@@ -2,7 +2,7 @@ services:
   web:
     build: .
     ports:
-      - "8000:8000"
+      - "18002:8000"
     volumes:
       - /volume1/docker/horilla2:/app
       - /volume1/docker/horilla2/staticfiles:/app/staticfiles
