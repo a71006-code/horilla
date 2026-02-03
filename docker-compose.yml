@@ -15,6 +15,7 @@ services:
       - DATABASE_URL=postgres://horilla_user:horilla_pass@db:5432/horilla_db
       - REDIS_URL=redis://:horilla_pass@redis:6379/0
       - DB_INIT_PASSWORD
+      - SESSION_COOKIE_NAME
     depends_on:
       - db
       - redis
