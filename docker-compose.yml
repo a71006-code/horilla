@@ -9,7 +9,7 @@ services:
       - /volume1/docker/horilla2/media:/app/media
     environment:
       - DEBUG=1
-      - SECRET_KEY=dev-secret-key
+      - SECRET_KEY
       - ALLOWED_HOSTS
       - CSRF_TRUSTED_ORIGINS=http://localhost:8000
       - DATABASE_URL=postgres://horilla_user:horilla_pass@db:5432/horilla_db
