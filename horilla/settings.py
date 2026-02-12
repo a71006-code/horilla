@@ -186,7 +186,7 @@ MESSAGE_TAGS = {
 }
 
 
-CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
+CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS", default=["https://pr.uscac.dpdns.org", "http://localhost:8000"])
 
 LOGIN_URL = "/login"
 
