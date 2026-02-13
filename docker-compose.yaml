@@ -12,7 +12,7 @@ services:
     volumes:
       #- /volume1/docker/horilla:/app
       - /volume1/docker/horilla/media:/app/media
-      - /volume1/docker/horilla/media:/app/report/static/report/forms/
+      - /volume1/docker/horilla/media:/app/report/static/report/forms/.
     depends_on:
       db:
         condition: service_healthy
