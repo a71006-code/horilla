@@ -13,29 +13,46 @@ class TaxFormFiller:
     
     FORM_MAPPINGS = {
         "941": {
-            # Map internal data keys to PDF field names
-            # Example mapping based on standard IRS Form 941 (2024/2025)
-            # These field names must be verified against the actual PDF template widget names.
-            "employer_name": "Name",
-            "employer_ein": "EIN",
-            "employer_address": "Address",
-            "total_wages": "f1_1", # Wages, tips, other compensation
-            "federal_income_tax": "f1_2", # Federal income tax withheld
-            "taxable_social_security_wages": "f1_5a_c1", # Column 1
-            "taxable_social_security_tips": "f1_5b_c1",
-            "taxable_medicare_wages": "f1_5c_c1",
-            # ... add more mappings as needed based on actual PDF inspection
+            # Form 941 (Rev. 2026/2024 XFA)
+            # Use 'topmostSubform[0].Page1[0]...' paths
+            "employer_name": "topmostSubform[0].Page1[0].f1_3[0]",
+            "employer_ein": "topmostSubform[0].Page1[0].f1_1[0]", 
+            "employer_address": "topmostSubform[0].Page1[0].EntityInfo[0].f1_5[0]",
+            "employer_city": "topmostSubform[0].Page1[0].EntityInfo[0].f1_6[0]", 
+            "employer_state": "topmostSubform[0].Page1[0].EntityInfo[0].f1_7[0]",
+            "employer_zip": "topmostSubform[0].Page1[0].EntityInfo[0].f1_8[0]",
+            "total_wages": "topmostSubform[0].Page1[0].f1_27[0]",
         },
         "940": {
-            "employer_name": "Name",
-            "employer_ein": "EIN",
-            # ...
+            # Form 940 (2023)
+            # XFA paths based on inspection
+            "employer_name": "topmostSubform[0].Page1[0].EmployerName[0].f1_2[0]",
+            "employer_ein": "topmostSubform[0].Page1[0].EIN[0].f1_4[0]",
+            "employer_address": "topmostSubform[0].Page1[0].Address[0].f1_5[0]",
+            "employer_city": "topmostSubform[0].Page1[0].City[0].f1_6[0]",
+            "employer_state": "topmostSubform[0].Page1[0].State[0].f1_7[0]", 
+            "employer_zip": "topmostSubform[0].Page1[0].Zip[0].f1_8[0]",
+            "futa_liability": "topmostSubform[0].Page1[0].f1_38[0]", # Line 12 Total FUTA Tax
         },
         "DE9": {
-             # California DE 9
+            # CA DE 9 (AcroForm - Simple Names)
+            "employer_name": "Business Name",
+            "employer_account_number": "Employer Account No", # Note: "No" vs "Number"
+            "employer_address": "Address",
+            "employer_city": "City",
+            "employer_state": "State", 
+            "employer_zip": "ZIP Code",
+            "quarter": "Quarter",
+            "year": "Year",
+            "total_wages": "Total Subject Wages", 
+            "pit_wages": "PIT Wages",
+            "pit_withheld": "PIT Withheld",
         },
         "DE9C": {
-             # California DE 9C
+             # CA DE 9C (Continuation)
+             "employer_name": "Business Name",
+             "employer_account_number": "Employer Account No",
+             "quarter_ended": "Quarter Ended", 
         }
     }
 
@@ -62,68 +79,65 @@ class TaxFormFiller:
         
         if not os.path.exists(form_path):
             logger.error(f"PDF template not found at {form_path}")
-            # Identify missing template gracefully?
-            # For now return None or raise error
-            raise FileNotFoundError(f"Template for Form {form_type} not found.")
+            raise FileNotFoundError(f"Template for Form {form_type} not found at {form_path}")
 
         try:
             doc = fitz.open(form_path)
-            # Iterate through pages? Usually form fields are document-wide in PyMuPDF's new versions,
-            # but sometimes access via page.
-            
-            # Use page 0 for simplified single page forms or iterate
-            for page in doc:
-                # Get existing widgets
-                widgets = page.widgets()
-                if not widgets:
-                    continue
-                
-                # We can also use doc.get_form_text_fields() to see names?
-                # But to set, we iterate widgets usually or use dedicated method?
-                pass 
-            
-            # PyMuPDF typical filling approach:
-            # Find widget by name and set value.
-            
             mapping = self.FORM_MAPPINGS.get(form_type, {})
             
+            filled_fields = 0
+            
             for page in doc:
                 widgets = page.widgets()
+                if not widgets: continue
+                
                 for widget in widgets:
-                    # check if widget name is in our data/mapping
-                    # Widget name might need normalization
                     field_name = widget.field_name
-                    
-                    # Check if we have data for this field directly
+                    val_to_set = None
+
+                    # Strategy 1: Direct Match (Data Key == PDF Field Name)
                     if field_name in data:
-                        widget.field_value = str(data[field_name])
+                        val_to_set = data[field_name]
+
+                    # Strategy 2: Mapping Match (Internal Key -> PDF Field Name)
+                    if val_to_set is None:
+                        for internal_key, pdf_key in mapping.items():
+                            if pdf_key == field_name and internal_key in data:
+                                val_to_set = data[internal_key]
+                                break
+                    
+                    # Strategy 3: Simple Name Fallback
+                    if val_to_set is None:
+                        for internal_key, pdf_key in mapping.items():
+                             if field_name == pdf_key.split('.')[-1].replace('[0]', ''):
+                                 if internal_key in data:
+                                     val_to_set = data[internal_key]
+                                     break
+                    
+                    # Strategy 4: DE9C Dynamic Rows
+                    if val_to_set is None and "employees" in data:
+                        import re
+                        match = re.search(r"(\D+)(\d+)$", field_name)
+                        if match:
+                             field_prefix = match.group(1).strip()
+                             row_index = int(match.group(2)) - 1
+                             employee_list = data["employees"]
+                             
+                             if 0 <= row_index < len(employee_list):
+                                 emp = employee_list[row_index]
+                                 if "SSN" in field_prefix: val_to_set = emp.get("ssn", "")
+                                 elif "First Name" in field_prefix: val_to_set = emp.get("first_name", "")
+                                 elif "Last Name" in field_prefix: val_to_set = emp.get("last_name", "")
+                                 elif "Subject Wages" in field_prefix: val_to_set = emp.get("total_wages", 0.0)
+                                 elif "PIT Wages" in field_prefix: val_to_set = emp.get("pit_wages", 0.0)
+                                 elif "PIT Withheld" in field_prefix: val_to_set = emp.get("pit_withheld", 0.0)
+
+                    if val_to_set is not None:
+                        widget.field_value = str(val_to_set)
                         widget.update()
-                        continue
-                    
-                    # Check mapping
-                    # Inverted mapping check (Value -> Key) or usually we iterate our data and find widget?
-                    # Better to iterate widgets and lookup.
-                    
-                    # Reverse lookup in mapping? 
-                    # Actually mapping is Internal Key -> PDF Field Name.
-                    # So we iterate our data, find the PDF Field Name, then find the widget?
-                    # No, that's slow.
-                    
-                    # Let's create a map PDF_NAME -> VALUE using `mapping` and `data`
-                    
-                    value_to_set = None
-                    
-                    # 1. Check if mapping has this field_name as a value
-                    for internal_key, pdf_key in mapping.items():
-                        if pdf_key == field_name and internal_key in data:
-                            value_to_set = data[internal_key]
-                            break
-                    
-                    if value_to_set is not None:
-                         widget.field_value = str(value_to_set)
-                         widget.update()
+                        filled_fields += 1
             
-            # doc.save(output_path) # We want bytes
+            logger.info(f"Filled {filled_fields} fields for {form_type}")
             return doc.write()
             
         except Exception as e:
