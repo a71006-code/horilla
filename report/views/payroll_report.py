@@ -638,6 +638,9 @@ if apps.is_installed("payroll"):
         # Calculate Total Gross for summary
         total_gross = payslips.aggregate(Sum("gross_pay"))["gross_pay__sum"] or 0.0
 
+        # Calculate Employee Count for 941 Line 1
+        employee_count = payslips.values("employee_id").distinct().count()
+
         # Prepare granular address for forms that need it (e.g. 941)
         # and combined for others
         emp_city = getattr(comp, "city", "") if comp else ""
@@ -652,12 +655,15 @@ if apps.is_installed("payroll"):
             "employer_zip": emp_zip,
             "employer_ein": employer_ein,
             "employer_account_number": employer_ein, # Use EIN as State ID fallback for now if no separate field
+            "employee_count": employee_count,
             "total_wages": round(total_gross, 2),
             
             # --- 941 Data ---
             "federal_income_tax": round(aggregates["941"]["federal_income_tax"], 2),
             "taxable_social_security_wages": round(aggregates["941"]["social_security_wages"], 2),
+            "taxable_social_security_tax": round(aggregates["941"]["social_security_tax"], 2),
             "taxable_medicare_wages": round(aggregates["941"]["medicare_wages"], 2),
+            "taxable_medicare_tax": round(aggregates["941"]["medicare_tax"], 2),
             "total_taxes_before_adjustments": round(
                 aggregates["941"]["federal_income_tax"] + 
                 aggregates["941"]["social_security_tax"] + 
