@@ -81,10 +81,19 @@ class TaxFormFiller:
         Returns:
             bytes: The filled PDF content as bytes.
         """
+        # DEBUG LOGGING
+        debug_log = "/home/ubuntu/.gemini/antigravity/scratch/horilla/debug_tax_fill.log"
+        with open(debug_log, "a") as f:
+            f.write(f"\n\n--- Filling {form_type} ---\n")
+            f.write(f"Data Keys: {list(data.keys())}\n")
+            if "total_wages" in data: f.write(f"Total Wages: {data['total_wages']}\n")
+            if "taxable_social_security_wages" in data: f.write(f"SS Wages: {data['taxable_social_security_wages']}\n")
+
         filename = f"f{form_type.lower()}.pdf" # e.g., f941.pdf
         form_path = os.path.join(self.forms_dir, filename)
         
         if not os.path.exists(form_path):
+            with open(debug_log, "a") as f: f.write(f"Template not found: {form_path}\n")
             logger.error(f"PDF template not found at {form_path}")
             raise FileNotFoundError(f"Template for Form {form_type} not found at {form_path}")
 
@@ -111,6 +120,7 @@ class TaxFormFiller:
                         for internal_key, pdf_key in mapping.items():
                             if pdf_key == field_name and internal_key in data:
                                 val_to_set = data[internal_key]
+                                # with open(debug_log, "a") as f: f.write(f"Matched {field_name} -> {internal_key} = {val_to_set}\n")
                                 break
                     
                     # Strategy 3: Simple Name Fallback
@@ -119,6 +129,7 @@ class TaxFormFiller:
                              if field_name == pdf_key.split('.')[-1].replace('[0]', ''):
                                  if internal_key in data:
                                      val_to_set = data[internal_key]
+                                     # with open(debug_log, "a") as f: f.write(f"Fallback Match {field_name} -> {internal_key} = {val_to_set}\n")
                                      break
                     
                     # Strategy 4: DE9C Dynamic Rows
@@ -144,6 +155,7 @@ class TaxFormFiller:
                         widget.update()
                         filled_fields += 1
             
+            with open(debug_log, "a") as f: f.write(f"Filled {filled_fields} fields.\n")
             logger.info(f"Filled {filled_fields} fields for {form_type}")
             return doc.write()
             
