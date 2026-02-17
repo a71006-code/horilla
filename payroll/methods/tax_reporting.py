@@ -161,14 +161,14 @@ def calculate_tax_liability(payslips, company=None):
             # --- Auto-Detect Logic (Migration compatibility) ---
             # If tax_reporting_type is None, guess based on title (Backward Compat)
             if not reporting_type:
-                if "social security" in title_lower: reporting_type = "FICA_SS"
-                elif "medicare" in title_lower: reporting_type = "FICA_MED"
-                elif "futa" in title_lower or "federal unemployment" in title_lower: reporting_type = "FUTA"
-                elif "sdi" in title_lower or "disability" in title_lower: reporting_type = "CA_SDI"
-                elif "ett" in title_lower or "training tax" in title_lower: reporting_type = "CA_ETT"
-                elif "ui" in title_lower or "unemployment" in title_lower: reporting_type = "CA_UI"
-                elif "ca tax" in title_lower or "california state" in title_lower: reporting_type = "CA_PIT"
-                elif "federal tax" in title_lower: reporting_type = "FIT"
+                if any(x in title_lower for x in ["social security", "soc sec", "fica ss", "oasdi"]): reporting_type = "FICA_SS"
+                elif any(x in title_lower for x in ["medicare", "fica med"]): reporting_type = "FICA_MED"
+                elif any(x in title_lower for x in ["futa", "federal unemployment"]): reporting_type = "FUTA"
+                elif any(x in title_lower for x in ["ca sdi", "casdi", "disability", "state disability"]): reporting_type = "CA_SDI"
+                elif any(x in title_lower for x in ["ca ett", "caett", "training tax", "employment training"]): reporting_type = "CA_ETT"
+                elif any(x in title_lower for x in ["ca ui", "caui", "ca unemployment", "state unemployment"]): reporting_type = "CA_UI"
+                elif any(x in title_lower for x in ["ca tax", "california state", "ca pit", "state income tax", "sit"]): reporting_type = "CA_PIT"
+                elif any(x in title_lower for x in ["federal tax", "fed tax", "fit", "federal withholding"]): reporting_type = "FIT"
 
             employer_rate = safefloat(config["employer_rate"])
             
