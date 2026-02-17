@@ -13,15 +13,22 @@ class TaxFormFiller:
     
     FORM_MAPPINGS = {
         "941": {
-            # Form 941 (Rev. 2026/2024 XFA)
-            # Use 'topmostSubform[0].Page1[0]...' paths
-            "employer_name": "topmostSubform[0].Page1[0].f1_3[0]",
-            "employer_ein": "topmostSubform[0].Page1[0].f1_1[0]", 
-            "employer_address": "topmostSubform[0].Page1[0].EntityInfo[0].f1_5[0]",
-            "employer_city": "topmostSubform[0].Page1[0].EntityInfo[0].f1_6[0]", 
-            "employer_state": "topmostSubform[0].Page1[0].EntityInfo[0].f1_7[0]",
-            "employer_zip": "topmostSubform[0].Page1[0].EntityInfo[0].f1_8[0]",
-            "total_wages": "topmostSubform[0].Page1[0].f1_27[0]",
+            # Form 941 (Rev. 2026/2024 XFA) - CORRECTED PATHS based on dump
+            "employer_ein": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_1[0]",
+            "employer_name": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_2[0]",
+            "employer_address": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_4[0]", # Street
+            "employer_city": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_6[0]",
+            "employer_state": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_7[0]",
+            "employer_zip": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_8[0]",
+            
+            # Line 2: Wages, tips, other compensation
+            "total_wages": "topmostSubform[0].Page1[0].f1_12[0]",
+            # Line 3: Federal income tax withheld
+            "federal_income_tax": "topmostSubform[0].Page1[0].f1_13[0]",
+            # Line 5a: Taxable social security wages (Column 1)
+            "taxable_social_security_wages": "topmostSubform[0].Page1[0].f1_14[0]",
+            # Line 5c: Taxable Medicare wages (Column 1)
+            "taxable_medicare_wages": "topmostSubform[0].Page1[0].f1_18[0]",
         },
         "940": {
             # Form 940 (2023)
