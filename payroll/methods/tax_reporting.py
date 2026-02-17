@@ -161,14 +161,22 @@ def calculate_tax_liability(payslips, company=None):
             # --- Auto-Detect Logic (Migration compatibility) ---
             # If tax_reporting_type is None, guess based on title (Backward Compat)
             if not reporting_type:
-                if any(x in title_lower for x in ["social security", "soc sec", "fica ss", "oasdi"]): reporting_type = "FICA_SS"
-                elif any(x in title_lower for x in ["medicare", "fica med"]): reporting_type = "FICA_MED"
-                elif any(x in title_lower for x in ["futa", "federal unemployment"]): reporting_type = "FUTA"
-                elif any(x in title_lower for x in ["ca sdi", "casdi", "disability", "state disability"]): reporting_type = "CA_SDI"
-                elif any(x in title_lower for x in ["ca ett", "caett", "training tax", "employment training"]): reporting_type = "CA_ETT"
-                elif any(x in title_lower for x in ["ca ui", "caui", "ca unemployment", "state unemployment"]): reporting_type = "CA_UI"
-                elif any(x in title_lower for x in ["ca tax", "california state", "ca pit", "state income tax", "sit"]): reporting_type = "CA_PIT"
-                elif any(x in title_lower for x in ["federal tax", "fed tax", "fit", "federal withholding"]): reporting_type = "FIT"
+                # Social Security / OASDI
+                if any(x in title_lower for x in ["social security", "soc sec", "fica ss", "oasdi", "social", "ss tax"]): reporting_type = "FICA_SS"
+                # Medicare
+                elif any(x in title_lower for x in ["medicare", "fica med", "med tax", "hospital"]): reporting_type = "FICA_MED"
+                # FUTA
+                elif any(x in title_lower for x in ["futa", "federal unemployment", "fed unemp", "unemployment tax"]): reporting_type = "FUTA"
+                # CA SDI
+                elif any(x in title_lower for x in ["ca sdi", "casdi", "disability", "state disability", "sdi"]): reporting_type = "CA_SDI"
+                # CA ETT
+                elif any(x in title_lower for x in ["ca ett", "caett", "training tax", "employment training", "ett"]): reporting_type = "CA_ETT"
+                # CA UI
+                elif any(x in title_lower for x in ["ca ui", "caui", "ca unemployment", "state unemployment", "sui"]): reporting_type = "CA_UI"
+                # CA PIT / State Income Tax
+                elif any(x in title_lower for x in ["ca tax", "california", "ca pit", "state income", "sit", "personal income", "pit"]): reporting_type = "CA_PIT"
+                # Federal Income Tax
+                elif any(x in title_lower for x in ["federal tax", "fed tax", "fit", "federal withholding", "income tax", "withholding"]): reporting_type = "FIT"
 
             employer_rate = safefloat(config["employer_rate"])
             

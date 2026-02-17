@@ -709,7 +709,7 @@ if apps.is_installed("payroll"):
             for d in deductions:
                  # Broadened check for DE9C employee PIT
                  title_lower = d.get("title", "").lower()
-                 if any(x in title_lower for x in ["ca tax", "california state", "ca pit", "state income tax", "sit"]):
+                 if any(x in title_lower for x in ["ca tax", "california", "ca pit", "state income", "sit", "personal income", "pit"]):
                      pit_amt += float(d.get("amount", 0))
             
             emp_data[eid]["pit_withheld"] += pit_amt
