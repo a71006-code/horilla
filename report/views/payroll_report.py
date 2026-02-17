@@ -707,8 +707,9 @@ if apps.is_installed("payroll"):
             
             pit_amt = 0.0
             for d in deductions:
-                 # We still check title or type if available, simple fallback:
-                 if "ca tax" in d.get("title", "").lower() or "california state" in d.get("title", "").lower():
+                 # Broadened check for DE9C employee PIT
+                 title_lower = d.get("title", "").lower()
+                 if any(x in title_lower for x in ["ca tax", "california state", "ca pit", "state income tax", "sit"]):
                      pit_amt += float(d.get("amount", 0))
             
             emp_data[eid]["pit_withheld"] += pit_amt
