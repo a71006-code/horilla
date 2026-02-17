@@ -22,13 +22,19 @@ class TaxFormFiller:
             "employer_zip": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_8[0]",
             
             # Line 2: Wages, tips, other compensation
-            "total_wages": "topmostSubform[0].Page1[0].f1_12[0]",
+            "total_wages": "topmostSubform[0].Page1[0].f1_13[0]",
             # Line 3: Federal income tax withheld
-            "federal_income_tax": "topmostSubform[0].Page1[0].f1_13[0]",
+            "federal_income_tax": "topmostSubform[0].Page1[0].f1_14[0]",
             # Line 5a: Taxable social security wages (Column 1)
-            "taxable_social_security_wages": "topmostSubform[0].Page1[0].f1_14[0]",
+            "taxable_social_security_wages": "topmostSubform[0].Page1[0].f1_15[0]",
             # Line 5c: Taxable Medicare wages (Column 1)
-            "taxable_medicare_wages": "topmostSubform[0].Page1[0].f1_18[0]",
+            # 5a(1)=15, 5a(2)=16, 5b(1)=17, 5b(2)=18, 5c(1)=19 ?
+            # Let's count fields: 5a(2), 5b(2), 5c(2), 5d(2) = 4 rows x 2 cols?
+            # Actually standard 941: 
+            # 5a SS Wages (15), Tax (16)
+            # 5b Tips (17), Tax (18)
+            # 5c Med Wages (19), Tax (20)
+            "taxable_medicare_wages": "topmostSubform[0].Page1[0].f1_19[0]",
         },
         "940": {
             # Form 940 (2023)
