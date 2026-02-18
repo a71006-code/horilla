@@ -37,6 +37,9 @@ class TaxFormFiller:
             "taxable_medicare_wages": "topmostSubform[0].Page1[0].f1_25[0]",
             "taxable_medicare_tax": "topmostSubform[0].Page1[0].f1_27[0]",
             
+            # Line 5e: Total SS and Medicare Tax (f1_33/34)
+            "total_social_security_and_medicare_tax": "topmostSubform[0].Page1[0].f1_33[0]",
+            
             # Line 6: Total Taxes (f1_37/38)
             "total_taxes_before_adjustments": "topmostSubform[0].Page1[0].f1_37[0]",
         },

@@ -233,6 +233,11 @@ def calculate_tax_liability(payslips, company=None):
             elif reporting_type == "FICA_MED":
                 form_aggregates["941"]["medicare_wages"] += base_amount # No limit for Medicare
                 form_aggregates["941"]["medicare_tax"] += (liability_amount + employee_withheld)
+            elif reporting_type == "FIT":
+                # Only add if it wasn't already added from the direct 'federal_tax' field
+                # (Standard Horilla uses direct field, but custom setups might use deductions)
+                if not safefloat(ph_data.get("federal_tax", 0)):
+                    form_aggregates["941"]["federal_income_tax"] += employee_withheld
             elif reporting_type == "FUTA":
                 form_aggregates["940"]["total_futa_wages"] += taxable_wages_for_component
                 form_aggregates["940"]["futa_liability"] += liability_amount

@@ -664,6 +664,10 @@ if apps.is_installed("payroll"):
             "taxable_social_security_tax": round(aggregates["941"]["social_security_tax"], 2),
             "taxable_medicare_wages": round(aggregates["941"]["medicare_wages"], 2),
             "taxable_medicare_tax": round(aggregates["941"]["medicare_tax"], 2),
+            "total_social_security_and_medicare_tax": round(
+                aggregates["941"]["social_security_tax"] + 
+                aggregates["941"]["medicare_tax"], 2
+            ),
             "total_taxes_before_adjustments": round(
                 aggregates["941"]["federal_income_tax"] + 
                 aggregates["941"]["social_security_tax"] + 
