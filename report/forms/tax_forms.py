@@ -15,7 +15,7 @@ class TaxFormFiller:
         "941": {
             # Form 941 (Rev. 2026/2024 XFA) - UPDATED FOR 2026 DRAFT (2-field per box)
             "employer_ein": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_1[0]",
-            "employer_name": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_2[0]",
+            "employer_name": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_3[0]",
             
             # Address Mapping Corrected for 2026 Draft
             "employer_address": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_5[0]",
@@ -46,11 +46,11 @@ class TaxFormFiller:
             "taxable_social_security_tax_dollars": "topmostSubform[0].Page1[0].f1_19[0]",
             "taxable_social_security_tax_cents": "topmostSubform[0].Page1[0].f1_20[0]",
             
-            # Line 5c: Medicare (Col 1: f1_25/26, Col 2: f1_27/28)
-            "taxable_medicare_wages_dollars": "topmostSubform[0].Page1[0].f1_25[0]",
-            "taxable_medicare_wages_cents": "topmostSubform[0].Page1[0].f1_26[0]",
-            "taxable_medicare_tax_dollars": "topmostSubform[0].Page1[0].f1_27[0]",
-            "taxable_medicare_tax_cents": "topmostSubform[0].Page1[0].f1_28[0]",
+            # Line 5c: Medicare (Col 1: f1_21/22, Col 2: f1_23/24)
+            "taxable_medicare_wages_dollars": "topmostSubform[0].Page1[0].f1_21[0]",
+            "taxable_medicare_wages_cents": "topmostSubform[0].Page1[0].f1_22[0]",
+            "taxable_medicare_tax_dollars": "topmostSubform[0].Page1[0].f1_23[0]",
+            "taxable_medicare_tax_cents": "topmostSubform[0].Page1[0].f1_24[0]",
             
             # Line 5e: Total SS and Medicare Tax (f1_33/34)
             "total_social_security_and_medicare_tax_dollars": "topmostSubform[0].Page1[0].f1_33[0]",
