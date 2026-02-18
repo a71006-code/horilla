@@ -70,22 +70,50 @@ class TaxFormFiller:
     }
 
     def __init__(self, forms_dir=None):
+        self.forms_dir = None
+        
+        # Candidate paths to check
+        candidates = []
         if forms_dir:
-            self.forms_dir = forms_dir
-        else:
-            # Check container internal static path (where files are copied during build)
-            internal_path = "/app/report/static/report/forms"
+            candidates.append(forms_dir)
             
-            # Check mapped volume path (from docker-compose)
-            mapped_path = os.path.join(settings.BASE_DIR, "report", "static", "report", "forms")
+        # 1. Check mapped path from settings (Standard Django structure)
+        # settings.BASE_DIR usually points to project root. 
+        # Inside Docker, if app is at /app/horilla, BASE_DIR might be /app/horilla or /app depending on structure.
+        # We assume standard structure: BASE_DIR/report/static/report/forms
+        path_via_settings = os.path.join(settings.BASE_DIR, "report", "static", "report", "forms")
+        candidates.append(path_via_settings)
 
-            if os.path.exists(mapped_path) and os.path.exists(os.path.join(mapped_path, "f941.pdf")):
-                self.forms_dir = mapped_path
-            elif os.path.exists(internal_path) and os.path.exists(os.path.join(internal_path, "f941.pdf")):
-                self.forms_dir = internal_path
+        # 2. Check explicit Docker internal path (based on docker-compose volume mapping)
+        # docker-compose.yaml maps to: /app/report/static/report/forms
+        candidates.append("/app/report/static/report/forms")
+        
+        # 3. Check for specific common dev paths just in case
+        candidates.append("/app/staticfiles/report/forms")
+
+        logger.info(f"[TaxFormFiller] Initializing. Checking paths: {candidates}")
+        
+        for path in candidates:
+            if os.path.exists(path):
+                # Verify it contains at least one of the expected files
+                if os.path.exists(os.path.join(path, "f941.pdf")):
+                    self.forms_dir = path
+                    logger.info(f"[TaxFormFiller] Found valid templates at: {path}")
+                    try:
+                        files = os.listdir(path)
+                        logger.info(f"[TaxFormFiller] Directory contents: {files}")
+                    except Exception as e:
+                        logger.error(f"[TaxFormFiller] Error listing directory {path}: {e}")
+                    break
+                else:
+                    logger.warning(f"[TaxFormFiller] Directory exists but f941.pdf not found: {path}")
             else:
-                # Local dev fallback
-                self.forms_dir = "/home/ubuntu/.gemini/antigravity/scratch/horilla/report/static/report/forms"
+                logger.debug(f"[TaxFormFiller] Path not found: {path}")
+
+        if not self.forms_dir:
+            logger.error("[TaxFormFiller] No valid template directory found in candidates.")
+            # Fallback to the settings path even if check failed, to produce a clear error message later
+            self.forms_dir = path_via_settings 
 
     def fill_form(self, form_type, data):
         """
@@ -98,20 +126,16 @@ class TaxFormFiller:
         Returns:
             bytes: The filled PDF content as bytes.
         """
-        # DEBUG LOGGING
-        debug_log = "/home/ubuntu/.gemini/antigravity/scratch/horilla/debug_tax_fill.log"
-        with open(debug_log, "a") as f:
-            f.write(f"\n\n--- Filling {form_type} ---\n")
-            f.write(f"Data Keys: {list(data.keys())}\n")
-            if "total_wages" in data: f.write(f"Total Wages: {data['total_wages']}\n")
-            if "taxable_social_security_wages" in data: f.write(f"SS Wages: {data['taxable_social_security_wages']}\n")
+        if not self.forms_dir:
+             raise FileNotFoundError("[TaxFormFiller] Template directory not configured.")
 
         filename = f"f{form_type.lower()}.pdf" # e.g., f941.pdf
         form_path = os.path.join(self.forms_dir, filename)
         
+        logger.info(f"[TaxFormFiller] Attempting to fill {form_type} using template: {form_path}")
+        
         if not os.path.exists(form_path):
-            with open(debug_log, "a") as f: f.write(f"Template not found: {form_path}\n")
-            logger.error(f"PDF template not found at {form_path}")
+            logger.error(f"[TaxFormFiller] Template file missing: {form_path}")
             raise FileNotFoundError(f"Template for Form {form_type} not found at {form_path}")
 
         try:
@@ -137,7 +161,6 @@ class TaxFormFiller:
                         for internal_key, pdf_key in mapping.items():
                             if pdf_key == field_name and internal_key in data:
                                 val_to_set = data[internal_key]
-                                # with open(debug_log, "a") as f: f.write(f"Matched {field_name} -> {internal_key} = {val_to_set}\n")
                                 break
                     
                     # Strategy 3: Simple Name Fallback
@@ -146,7 +169,6 @@ class TaxFormFiller:
                              if field_name == pdf_key.split('.')[-1].replace('[0]', ''):
                                  if internal_key in data:
                                      val_to_set = data[internal_key]
-                                     # with open(debug_log, "a") as f: f.write(f"Fallback Match {field_name} -> {internal_key} = {val_to_set}\n")
                                      break
                     
                     # Strategy 4: DE9C Dynamic Rows
@@ -172,10 +194,9 @@ class TaxFormFiller:
                         widget.update()
                         filled_fields += 1
             
-            with open(debug_log, "a") as f: f.write(f"Filled {filled_fields} fields.\n")
-            logger.info(f"Filled {filled_fields} fields for {form_type}")
+            logger.info(f"[TaxFormFiller] Successfully filled {filled_fields} fields for {form_type}")
             return doc.write()
             
         except Exception as e:
-            logger.exception(f"Error filling form {form_type}: {e}")
+            logger.exception(f"[TaxFormFiller] detailed error filling form {form_type}: {e}")
             raise
