@@ -9,6 +9,7 @@ services:
     environment:
       DATABASE_URL: "postgres://postgres:postgres@db:5432/horilla"
     command: sh ./entrypoint.sh
+    user: "1026:100"
     volumes:
       #- /volume1/docker/horilla:/app
       - /volume1/docker/horilla/media:/app/media
