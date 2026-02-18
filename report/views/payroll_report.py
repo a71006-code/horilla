@@ -760,7 +760,9 @@ if apps.is_installed("payroll"):
 
         data = {
             "employer_name": company_name,
-            "employer_address": company_address,
+            "employer_trade_name": getattr(comp, "company_trade_name", ""),
+            "employer_address": getattr(comp, "address", ""),
+            "employer_address_line2": "", # Optional street continuation
             "employer_city": emp_city,
             "employer_state": emp_state,
             "employer_zip": emp_zip,
