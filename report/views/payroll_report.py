@@ -650,28 +650,113 @@ if apps.is_installed("payroll"):
         # Helper to split dollars and cents
         def split_amt(val):
             v = round(float(val or 0), 2)
-            dollars = int(v)
-            cents = int(round((v - dollars) * 100))
-            return str(dollars), f"{cents:02d}"
+            sign = "-" if v < 0 else ""
+            dollars = int(abs(v))
+            cents = int(round((abs(v) - dollars) * 100))
+            return f"{sign}{dollars}", f"{cents:02d}"
 
-        # Current Quarter Logic
+        def parse_bool_param(name, default=False):
+            raw = request.GET.get(name, "")
+            if raw == "":
+                return default
+            return str(raw).strip().lower() in {"1", "true", "yes", "on", "y"}
+
+        def parse_amount_param(name):
+            raw = str(request.GET.get(name, "")).strip()
+            if not raw:
+                return None
+            try:
+                return round(float(raw), 2)
+            except (TypeError, ValueError):
+                return None
+
+        # Quarter Logic (driven by selected period when possible)
         import datetime
         today = datetime.date.today()
+        reference_date = start_date_from or end_date_from or start_date_to or end_date_to or today
+        quarter_idx = (reference_date.month - 1) // 3
+        quarter_months = [quarter_idx * 3 + 1, quarter_idx * 3 + 2, quarter_idx * 3 + 3]
         q_map = {"quarter_1": "", "quarter_2": "", "quarter_3": "", "quarter_4": ""}
-        if 1 <= today.month <= 3: q_map["quarter_1"] = "1"
-        elif 4 <= today.month <= 6: q_map["quarter_2"] = "1"
-        elif 7 <= today.month <= 9: q_map["quarter_3"] = "1"
+        if quarter_idx == 0: q_map["quarter_1"] = "1"
+        elif quarter_idx == 1: q_map["quarter_2"] = "1"
+        elif quarter_idx == 2: q_map["quarter_3"] = "1"
         else: q_map["quarter_4"] = "1"
 
         # Map All Numeric Fields to Split Format
         w_d, w_c = split_amt(total_gross)
-        fit_d, fit_c = split_amt(aggregates["941"]["federal_income_tax"])
-        ssw_d, ssw_c = split_amt(aggregates["941"]["social_security_wages"])
-        sst_d, sst_c = split_amt(aggregates["941"]["social_security_tax"])
-        medw_d, medw_c = split_amt(aggregates["941"]["medicare_wages"])
-        medt_d, medt_c = split_amt(aggregates["941"]["medicare_tax"])
-        total_ssmed_d, total_ssmed_c = split_amt(aggregates["941"]["social_security_tax"] + aggregates["941"]["medicare_tax"])
-        total_tax_d, total_tax_c = split_amt(aggregates["941"]["federal_income_tax"] + aggregates["941"]["social_security_tax"] + aggregates["941"]["medicare_tax"])
+        fit_val = float(aggregates["941"]["federal_income_tax"] or 0)
+        ssw_val = float(aggregates["941"]["social_security_wages"] or 0)
+        sst_val = float(aggregates["941"]["social_security_tax"] or 0)
+        medw_val = float(aggregates["941"]["medicare_wages"] or 0)
+        medt_val = float(aggregates["941"]["medicare_tax"] or 0)
+        total_ssmed_val = sst_val + medt_val
+        total_tax_val = fit_val + sst_val + medt_val
+
+        fit_d, fit_c = split_amt(fit_val)
+        ssw_d, ssw_c = split_amt(ssw_val)
+        sst_d, sst_c = split_amt(sst_val)
+        medw_d, medw_c = split_amt(medw_val)
+        medt_d, medt_c = split_amt(medt_val)
+        total_ssmed_d, total_ssmed_c = split_amt(total_ssmed_val)
+        total_tax_d, total_tax_c = split_amt(total_tax_val)
+
+        # Part 2 (Deposit Schedule) automation
+        deposit_schedule = str(request.GET.get("deposit_schedule", "")).strip().lower()
+        if deposit_schedule not in {"line12_less_2500", "monthly", "semiweekly"}:
+            deposit_schedule = "line12_less_2500" if total_tax_val < 2500 else "monthly"
+
+        month1_manual = parse_amount_param("monthly_tax_liability_month1")
+        month2_manual = parse_amount_param("monthly_tax_liability_month2")
+        month3_manual = parse_amount_param("monthly_tax_liability_month3")
+        quarter_total_manual = parse_amount_param("quarter_total_tax_liability")
+
+        month_liabilities = [0.0, 0.0, 0.0]
+        if any(v is not None for v in [month1_manual, month2_manual, month3_manual]):
+            month_liabilities = [month1_manual or 0.0, month2_manual or 0.0, month3_manual or 0.0]
+        else:
+            month_gross = {quarter_months[0]: 0.0, quarter_months[1]: 0.0, quarter_months[2]: 0.0}
+            for payslip in payslips:
+                pay_date = getattr(payslip, "start_date", None) or getattr(payslip, "end_date", None)
+                if not pay_date or pay_date.month not in month_gross:
+                    continue
+                month_gross[pay_date.month] += float(getattr(payslip, "gross_pay", 0) or 0)
+
+            gross_total = sum(month_gross.values())
+            if gross_total > 0:
+                raw_m1 = round(total_tax_val * (month_gross[quarter_months[0]] / gross_total), 2)
+                raw_m2 = round(total_tax_val * (month_gross[quarter_months[1]] / gross_total), 2)
+                raw_m3 = round(total_tax_val - raw_m1 - raw_m2, 2)
+                month_liabilities = [raw_m1, raw_m2, raw_m3]
+
+        quarter_total_liability = round(
+            quarter_total_manual if quarter_total_manual is not None else sum(month_liabilities), 2
+        )
+
+        month1_d, month1_c = split_amt(month_liabilities[0])
+        month2_d, month2_c = split_amt(month_liabilities[1])
+        month3_d, month3_c = split_amt(month_liabilities[2])
+        qtotal_d, qtotal_c = split_amt(quarter_total_liability)
+
+        # Part 3 / 4 / 5 controls
+        business_closed = parse_bool_param("business_closed", default=False)
+        seasonal_employer = parse_bool_param("seasonal_employer", default=False)
+        final_wage_date = parse_date(request.GET.get("final_wage_date", ""))
+        final_wage_date_str = final_wage_date.strftime("%m/%d/%Y") if final_wage_date else ""
+
+        third_party_choice = str(request.GET.get("third_party_designee", "")).strip().lower()
+        if third_party_choice == "yes":
+            third_party_yes = "1"
+            third_party_no = ""
+        elif third_party_choice == "no":
+            third_party_yes = ""
+            third_party_no = "1"
+        else:
+            third_party_yes = ""
+            third_party_no = "1"
+
+        ein_digits = "".join(ch for ch in str(employer_ein or "") if ch.isdigit())
+        ein_part1 = ein_digits[:2]
+        ein_part2 = ein_digits[2:]
 
         data = {
             "employer_name": company_name,
@@ -680,6 +765,9 @@ if apps.is_installed("payroll"):
             "employer_state": emp_state,
             "employer_zip": emp_zip,
             "employer_ein": employer_ein,
+            "employer_name_page2": company_name,
+            "employer_ein_page2_part1": ein_part1,
+            "employer_ein_page2_part2": ein_part2,
             "employer_account_number": employer_ein, 
             "employee_count": employee_count,
             
@@ -719,6 +807,46 @@ if apps.is_installed("payroll"):
             "total_taxes_after_credits_cents": total_tax_c,
             "balance_due_dollars": total_tax_d,
             "balance_due_cents": total_tax_c,
+
+            # --- 941 Page 2 / Part 2 ---
+            "deposit_schedule_line12_less_2500": "1" if deposit_schedule == "line12_less_2500" else "",
+            "deposit_schedule_monthly": "1" if deposit_schedule == "monthly" else "",
+            "deposit_schedule_semiweekly": "1" if deposit_schedule == "semiweekly" else "",
+            "month_1_tax_liability_dollars": month1_d if deposit_schedule == "monthly" else "",
+            "month_1_tax_liability_cents": month1_c if deposit_schedule == "monthly" else "",
+            "month_2_tax_liability_dollars": month2_d if deposit_schedule == "monthly" else "",
+            "month_2_tax_liability_cents": month2_c if deposit_schedule == "monthly" else "",
+            "month_3_tax_liability_dollars": month3_d if deposit_schedule == "monthly" else "",
+            "month_3_tax_liability_cents": month3_c if deposit_schedule == "monthly" else "",
+            "quarter_total_tax_liability_dollars": qtotal_d if deposit_schedule == "monthly" else "",
+            "quarter_total_tax_liability_cents": qtotal_c if deposit_schedule == "monthly" else "",
+
+            # --- 941 Page 2 / Part 3 ---
+            "business_closed_or_stopped_paying_wages": "1" if business_closed else "",
+            "final_date_wages_paid": final_wage_date_str,
+            "seasonal_employer": "1" if seasonal_employer else "",
+
+            # --- 941 Page 2 / Part 4 ---
+            "third_party_designee_yes": third_party_yes,
+            "third_party_designee_name": request.GET.get("third_party_designee_name", ""),
+            "third_party_designee_phone": request.GET.get("third_party_designee_phone", ""),
+            "third_party_designee_pin": request.GET.get("third_party_designee_pin", ""),
+            "third_party_designee_no": third_party_no,
+
+            # --- 941 Page 2 / Part 5 ---
+            "signer_name": request.GET.get("signer_name", company_name),
+            "signer_title": request.GET.get("signer_title", ""),
+            "signer_daytime_phone": request.GET.get("signer_daytime_phone", ""),
+            "paid_preparer_self_employed": "1" if parse_bool_param("paid_preparer_self_employed", default=False) else "",
+            "paid_preparer_name": request.GET.get("paid_preparer_name", ""),
+            "paid_preparer_ptin": request.GET.get("paid_preparer_ptin", ""),
+            "paid_preparer_firm_name": request.GET.get("paid_preparer_firm_name", ""),
+            "paid_preparer_ein": request.GET.get("paid_preparer_ein", ""),
+            "paid_preparer_address": request.GET.get("paid_preparer_address", ""),
+            "paid_preparer_phone": request.GET.get("paid_preparer_phone", ""),
+            "paid_preparer_city": request.GET.get("paid_preparer_city", ""),
+            "paid_preparer_state": request.GET.get("paid_preparer_state", ""),
+            "paid_preparer_zip": request.GET.get("paid_preparer_zip", ""),
 
             # --- 940 Data ---
             "total_futa_wages": round(aggregates["940"]["total_futa_wages"], 2),

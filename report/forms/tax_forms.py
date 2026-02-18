@@ -68,9 +68,58 @@ class TaxFormFiller:
             "total_taxes_after_credits_dollars": "topmostSubform[0].Page1[0].f1_49[0]",
             "total_taxes_after_credits_cents": "topmostSubform[0].Page1[0].f1_50[0]",
 
+            # Line 13: Total Deposits (f1_51/52)
+            "total_deposits_dollars": "topmostSubform[0].Page1[0].f1_51[0]",
+            "total_deposits_cents": "topmostSubform[0].Page1[0].f1_52[0]",
+
             # Line 14: Balance Due (f1_53/54)
             "balance_due_dollars": "topmostSubform[0].Page1[0].f1_53[0]",
             "balance_due_cents": "topmostSubform[0].Page1[0].f1_54[0]",
+
+            # Page 2 Header Continuation
+            "employer_name_page2": "topmostSubform[0].Page2[0].Name_ReadOrder[0].f1_3[0]",
+            "employer_ein_page2_part1": "topmostSubform[0].Page2[0].EIN_Number[0].f1_1[0]",
+            "employer_ein_page2_part2": "topmostSubform[0].Page2[0].EIN_Number[0].f1_2[0]",
+
+            # Part 2: Deposit Schedule
+            "deposit_schedule_line12_less_2500": "topmostSubform[0].Page2[0].c2_1[0]",
+            "deposit_schedule_monthly": "topmostSubform[0].Page2[0].c2_1[1]",
+            "deposit_schedule_semiweekly": "topmostSubform[0].Page2[0].c2_1[2]",
+            "month_1_tax_liability_dollars": "topmostSubform[0].Page2[0].f2_1[0]",
+            "month_1_tax_liability_cents": "topmostSubform[0].Page2[0].f2_2[0]",
+            "month_2_tax_liability_dollars": "topmostSubform[0].Page2[0].f2_3[0]",
+            "month_2_tax_liability_cents": "topmostSubform[0].Page2[0].f2_4[0]",
+            "month_3_tax_liability_dollars": "topmostSubform[0].Page2[0].f2_5[0]",
+            "month_3_tax_liability_cents": "topmostSubform[0].Page2[0].f2_6[0]",
+            "quarter_total_tax_liability_dollars": "topmostSubform[0].Page2[0].f2_7[0]",
+            "quarter_total_tax_liability_cents": "topmostSubform[0].Page2[0].f2_8[0]",
+
+            # Part 3: About Your Business
+            "business_closed_or_stopped_paying_wages": "topmostSubform[0].Page2[0].c2_2[0]",
+            "final_date_wages_paid": "topmostSubform[0].Page2[0].f2_9[0]",
+            "seasonal_employer": "topmostSubform[0].Page2[0].c2_3[0]",
+
+            # Part 4: Third-Party Designee
+            "third_party_designee_yes": "topmostSubform[0].Page2[0].c2_4[0]",
+            "third_party_designee_name": "topmostSubform[0].Page2[0].f2_10[0]",
+            "third_party_designee_phone": "topmostSubform[0].Page2[0].f2_11[0]",
+            "third_party_designee_pin": "topmostSubform[0].Page2[0].f2_12[0]",
+            "third_party_designee_no": "topmostSubform[0].Page2[0].c2_4[1]",
+
+            # Part 5: Signature / Paid Preparer
+            "signer_name": "topmostSubform[0].Page2[0].f2_13[0]",
+            "signer_title": "topmostSubform[0].Page2[0].f2_14[0]",
+            "signer_daytime_phone": "topmostSubform[0].Page2[0].f2_15[0]",
+            "paid_preparer_self_employed": "topmostSubform[0].Page2[0].c2_5[0]",
+            "paid_preparer_name": "topmostSubform[0].Page2[0].f2_16[0]",
+            "paid_preparer_ptin": "topmostSubform[0].Page2[0].f2_17[0]",
+            "paid_preparer_firm_name": "topmostSubform[0].Page2[0].f2_18[0]",
+            "paid_preparer_ein": "topmostSubform[0].Page2[0].f2_19[0]",
+            "paid_preparer_address": "topmostSubform[0].Page2[0].f2_20[0]",
+            "paid_preparer_phone": "topmostSubform[0].Page2[0].f2_21[0]",
+            "paid_preparer_city": "topmostSubform[0].Page2[0].f2_22[0]",
+            "paid_preparer_state": "topmostSubform[0].Page2[0].f2_23[0]",
+            "paid_preparer_zip": "topmostSubform[0].Page2[0].f2_24[0]",
         },
         "940": {
             # Form 940 (2023)

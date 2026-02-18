@@ -99,6 +99,125 @@
                                                     </div>
                                                 </div>
                                             </div>
+                                            <hr>
+                                            <div class="row">
+                                                <div class="col-sm-12">
+                                                    <h6 class="fw-bold mb-2">{% trans "Form 941 (Page 2: Parts 2–5)" %}</h6>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-sm-6">
+                                                    <div class="oh-input-group">
+                                                        <label class="oh-label" for="deposit_schedule">{% trans "Deposit Schedule (Part 2)" %}</label>
+                                                        <select class="oh-select w-100" id="deposit_schedule" name="deposit_schedule">
+                                                            <option value="">{% trans "Auto (Line 12 based)" %}</option>
+                                                            <option value="line12_less_2500">{% trans "Line 12 is less than $2,500" %}</option>
+                                                            <option value="monthly">{% trans "Monthly schedule depositor" %}</option>
+                                                            <option value="semiweekly">{% trans "Semiweekly schedule depositor" %}</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-3">
+                                                    <div class="oh-input-group">
+                                                        <label class="oh-label" for="monthly_tax_liability_month1">{% trans "Month 1 Liability" %}</label>
+                                                        <input class="oh-input w-100" type="number" step="0.01" name="monthly_tax_liability_month1" id="monthly_tax_liability_month1">
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-3">
+                                                    <div class="oh-input-group">
+                                                        <label class="oh-label" for="monthly_tax_liability_month2">{% trans "Month 2 Liability" %}</label>
+                                                        <input class="oh-input w-100" type="number" step="0.01" name="monthly_tax_liability_month2" id="monthly_tax_liability_month2">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-sm-3">
+                                                    <div class="oh-input-group">
+                                                        <label class="oh-label" for="monthly_tax_liability_month3">{% trans "Month 3 Liability" %}</label>
+                                                        <input class="oh-input w-100" type="number" step="0.01" name="monthly_tax_liability_month3" id="monthly_tax_liability_month3">
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-3">
+                                                    <div class="oh-input-group">
+                                                        <label class="oh-label" for="quarter_total_tax_liability">{% trans "Quarter Total Liability" %}</label>
+                                                        <input class="oh-input w-100" type="number" step="0.01" name="quarter_total_tax_liability" id="quarter_total_tax_liability">
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-3 d-flex align-items-end">
+                                                    <div class="oh-input-group">
+                                                        <label class="oh-label" for="business_closed">
+                                                            <input type="checkbox" id="business_closed" name="business_closed">
+                                                            {% trans "Business closed/stopped wages" %}
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-3">
+                                                    <div class="oh-input-group">
+                                                        <label class="oh-label" for="final_wage_date">{% trans "Final Wage Date" %}</label>
+                                                        <input class="oh-input w-100" type="date" name="final_wage_date" id="final_wage_date">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-sm-4 d-flex align-items-end">
+                                                    <div class="oh-input-group">
+                                                        <label class="oh-label" for="seasonal_employer">
+                                                            <input type="checkbox" id="seasonal_employer" name="seasonal_employer">
+                                                            {% trans "Seasonal employer (Part 3)" %}
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-4">
+                                                    <div class="oh-input-group">
+                                                        <label class="oh-label" for="third_party_designee">{% trans "Third-Party Designee (Part 4)" %}</label>
+                                                        <select class="oh-select w-100" id="third_party_designee" name="third_party_designee">
+                                                            <option value="">{% trans "Default: No" %}</option>
+                                                            <option value="yes">{% trans "Yes" %}</option>
+                                                            <option value="no">{% trans "No" %}</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-4">
+                                                    <div class="oh-input-group">
+                                                        <label class="oh-label" for="third_party_designee_pin">{% trans "Designee PIN" %}</label>
+                                                        <input class="oh-input w-100" type="text" maxlength="5" name="third_party_designee_pin" id="third_party_designee_pin">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-sm-6">
+                                                    <div class="oh-input-group">
+                                                        <label class="oh-label" for="third_party_designee_name">{% trans "Designee Name" %}</label>
+                                                        <input class="oh-input w-100" type="text" name="third_party_designee_name" id="third_party_designee_name">
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-6">
+                                                    <div class="oh-input-group">
+                                                        <label class="oh-label" for="third_party_designee_phone">{% trans "Designee Phone" %}</label>
+                                                        <input class="oh-input w-100" type="text" name="third_party_designee_phone" id="third_party_designee_phone">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-sm-4">
+                                                    <div class="oh-input-group">
+                                                        <label class="oh-label" for="signer_name">{% trans "Signer Name (Part 5)" %}</label>
+                                                        <input class="oh-input w-100" type="text" name="signer_name" id="signer_name">
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-4">
+                                                    <div class="oh-input-group">
+                                                        <label class="oh-label" for="signer_title">{% trans "Signer Title" %}</label>
+                                                        <input class="oh-input w-100" type="text" name="signer_title" id="signer_title">
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-4">
+                                                    <div class="oh-input-group">
+                                                        <label class="oh-label" for="signer_daytime_phone">{% trans "Signer Daytime Phone" %}</label>
+                                                        <input class="oh-input w-100" type="text" name="signer_daytime_phone" id="signer_daytime_phone">
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <div class="row">
                                                 <div class="col-sm-6">
                                                     <div class="oh-input-group">
