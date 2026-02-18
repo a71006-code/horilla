@@ -15,10 +15,10 @@ class TaxFormFiller:
         "941": {
             # Form 941 (Rev. 2026/2024 XFA) - UPDATED FOR 2026 DRAFT (2-field per box)
             "employer_ein": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_1[0]",
-            "employer_name": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_3[0]",
+            "employer_name": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_2[0]",
             
             # Address Mapping Corrected for 2026 Draft
-            "employer_address": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_5[0]",
+            "employer_address": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_4[0]",
             "employer_city": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_6[0]",
             "employer_state": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_7[0]",
             "employer_zip": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_8[0]",
