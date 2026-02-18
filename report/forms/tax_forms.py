@@ -74,7 +74,12 @@ class TaxFormFiller:
             self.forms_dir = forms_dir
         else:
             # Default to report/static/report/forms/
+            # In container, this is usually at /app/report/static/report/forms
             self.forms_dir = os.path.join(settings.BASE_DIR, "report", "static", "report", "forms")
+            
+            # Fallback for Docker production where BASE_DIR might differ
+            if not os.path.exists(self.forms_dir):
+                self.forms_dir = "/app/report/static/report/forms"
 
     def fill_form(self, form_type, data):
         """
