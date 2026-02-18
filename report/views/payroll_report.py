@@ -647,6 +647,32 @@ if apps.is_installed("payroll"):
         emp_state = getattr(comp, "state", "") if comp else ""
         emp_zip = getattr(comp, "zip", "") if comp else ""
 
+        # Helper to split dollars and cents
+        def split_amt(val):
+            v = round(float(val or 0), 2)
+            dollars = int(v)
+            cents = int(round((v - dollars) * 100))
+            return str(dollars), f"{cents:02d}"
+
+        # Current Quarter Logic
+        import datetime
+        today = datetime.date.today()
+        q_map = {"quarter_1": "", "quarter_2": "", "quarter_3": "", "quarter_4": ""}
+        if 1 <= today.month <= 3: q_map["quarter_1"] = "1"
+        elif 4 <= today.month <= 6: q_map["quarter_2"] = "1"
+        elif 7 <= today.month <= 9: q_map["quarter_3"] = "1"
+        else: q_map["quarter_4"] = "1"
+
+        # Map All Numeric Fields to Split Format
+        w_d, w_c = split_amt(total_gross)
+        fit_d, fit_c = split_amt(aggregates["941"]["federal_income_tax"])
+        ssw_d, ssw_c = split_amt(aggregates["941"]["social_security_wages"])
+        sst_d, sst_c = split_amt(aggregates["941"]["social_security_tax"])
+        medw_d, medw_c = split_amt(aggregates["941"]["medicare_wages"])
+        medt_d, medt_c = split_amt(aggregates["941"]["medicare_tax"])
+        total_ssmed_d, total_ssmed_c = split_amt(aggregates["941"]["social_security_tax"] + aggregates["941"]["medicare_tax"])
+        total_tax_d, total_tax_c = split_amt(aggregates["941"]["federal_income_tax"] + aggregates["941"]["social_security_tax"] + aggregates["941"]["medicare_tax"])
+
         data = {
             "employer_name": company_name,
             "employer_address": company_address,
@@ -654,26 +680,46 @@ if apps.is_installed("payroll"):
             "employer_state": emp_state,
             "employer_zip": emp_zip,
             "employer_ein": employer_ein,
-            "employer_account_number": employer_ein, # Use EIN as State ID fallback for now if no separate field
+            "employer_account_number": employer_ein, 
             "employee_count": employee_count,
-            "total_wages": round(total_gross, 2),
             
-            # --- 941 Data ---
-            "federal_income_tax": round(aggregates["941"]["federal_income_tax"], 2),
-            "taxable_social_security_wages": round(aggregates["941"]["social_security_wages"], 2),
-            "taxable_social_security_tax": round(aggregates["941"]["social_security_tax"], 2),
-            "taxable_medicare_wages": round(aggregates["941"]["medicare_wages"], 2),
-            "taxable_medicare_tax": round(aggregates["941"]["medicare_tax"], 2),
-            "total_social_security_and_medicare_tax": round(
-                aggregates["941"]["social_security_tax"] + 
-                aggregates["941"]["medicare_tax"], 2
-            ),
-            "total_taxes_before_adjustments": round(
-                aggregates["941"]["federal_income_tax"] + 
-                aggregates["941"]["social_security_tax"] + 
-                aggregates["941"]["medicare_tax"], 2
-            ),
+            # Quarters
+            **q_map,
+
+            # Line 2
+            "total_wages_dollars": w_d,
+            "total_wages_cents": w_c,
             
+            # Line 3
+            "federal_income_tax_dollars": fit_d,
+            "federal_income_tax_cents": fit_c,
+            
+            # Line 5a
+            "taxable_social_security_wages_dollars": ssw_d,
+            "taxable_social_security_wages_cents": ssw_c,
+            "taxable_social_security_tax_dollars": sst_d,
+            "taxable_social_security_tax_cents": sst_c,
+            
+            # Line 5c
+            "taxable_medicare_wages_dollars": medw_d,
+            "taxable_medicare_wages_cents": medw_c,
+            "taxable_medicare_tax_dollars": medt_d,
+            "taxable_medicare_tax_cents": medt_c,
+            
+            # Line 5e
+            "total_social_security_and_medicare_tax_dollars": total_ssmed_d,
+            "total_social_security_and_medicare_tax_cents": total_ssmed_c,
+            
+            # Line 6 / 10 / 12
+            "total_taxes_before_adjustments_dollars": total_tax_d,
+            "total_taxes_before_adjustments_cents": total_tax_c,
+            "total_taxes_after_adjustments_dollars": total_tax_d,
+            "total_taxes_after_adjustments_cents": total_tax_c,
+            "total_taxes_after_credits_dollars": total_tax_d,
+            "total_taxes_after_credits_cents": total_tax_c,
+            "balance_due_dollars": total_tax_d,
+            "balance_due_cents": total_tax_c,
+
             # --- 940 Data ---
             "total_futa_wages": round(aggregates["940"]["total_futa_wages"], 2),
             "futa_liability": round(aggregates["940"]["futa_liability"], 2),

@@ -18,34 +18,59 @@ class TaxFormFiller:
             "employer_name": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_2[0]",
             
             # Address Mapping Corrected for 2026 Draft
-            # f1_4 is "Number", f1_5 is "Street", f1_6 is "Suite"
-            # We will use f1_5 for the full street address to avoid horizontal overlap
             "employer_address": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_5[0]",
             "employer_city": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_6[0]",
             "employer_state": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_7[0]",
             "employer_zip": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_8[0]",
             
+            # Quarter Checkboxes (c1_1[0-3])
+            "quarter_1": "topmostSubform[0].Page1[0].Header[0].ReportForQuarter[0].c1_1[0]",
+            "quarter_2": "topmostSubform[0].Page1[0].Header[0].ReportForQuarter[0].c1_1[1]",
+            "quarter_3": "topmostSubform[0].Page1[0].Header[0].ReportForQuarter[0].c1_1[2]",
+            "quarter_4": "topmostSubform[0].Page1[0].Header[0].ReportForQuarter[0].c1_1[3]",
+
             # Line 1: Number of employees (Single field)
             "employee_count": "topmostSubform[0].Page1[0].f1_12[0]",
             
-            # Line 2: Wages (Uses f1_13/f1_14 - we put total in f1_13)
-            "total_wages": "topmostSubform[0].Page1[0].f1_13[0]",
-            # Line 3: FIT (Uses f1_15/f1_16 - we put total in f1_15)
-            "federal_income_tax": "topmostSubform[0].Page1[0].f1_15[0]",
+            # Line 2: Wages (Uses f1_13/f1_14 - split into dollars and cents)
+            "total_wages_dollars": "topmostSubform[0].Page1[0].f1_13[0]",
+            "total_wages_cents": "topmostSubform[0].Page1[0].f1_14[0]",
+            
+            # Line 3: FIT (Uses f1_15/f1_16)
+            "federal_income_tax_dollars": "topmostSubform[0].Page1[0].f1_15[0]",
+            "federal_income_tax_cents": "topmostSubform[0].Page1[0].f1_16[0]",
             
             # Line 5a: SS Wages (Col 1: f1_17/18, Col 2: f1_19/20)
-            "taxable_social_security_wages": "topmostSubform[0].Page1[0].f1_17[0]",
-            "taxable_social_security_tax": "topmostSubform[0].Page1[0].f1_19[0]",
+            "taxable_social_security_wages_dollars": "topmostSubform[0].Page1[0].f1_17[0]",
+            "taxable_social_security_wages_cents": "topmostSubform[0].Page1[0].f1_18[0]",
+            "taxable_social_security_tax_dollars": "topmostSubform[0].Page1[0].f1_19[0]",
+            "taxable_social_security_tax_cents": "topmostSubform[0].Page1[0].f1_20[0]",
             
             # Line 5c: Medicare (Col 1: f1_25/26, Col 2: f1_27/28)
-            "taxable_medicare_wages": "topmostSubform[0].Page1[0].f1_25[0]",
-            "taxable_medicare_tax": "topmostSubform[0].Page1[0].f1_27[0]",
+            "taxable_medicare_wages_dollars": "topmostSubform[0].Page1[0].f1_25[0]",
+            "taxable_medicare_wages_cents": "topmostSubform[0].Page1[0].f1_26[0]",
+            "taxable_medicare_tax_dollars": "topmostSubform[0].Page1[0].f1_27[0]",
+            "taxable_medicare_tax_cents": "topmostSubform[0].Page1[0].f1_28[0]",
             
             # Line 5e: Total SS and Medicare Tax (f1_33/34)
-            "total_social_security_and_medicare_tax": "topmostSubform[0].Page1[0].f1_33[0]",
+            "total_social_security_and_medicare_tax_dollars": "topmostSubform[0].Page1[0].f1_33[0]",
+            "total_social_security_and_medicare_tax_cents": "topmostSubform[0].Page1[0].f1_34[0]",
             
             # Line 6: Total Taxes (f1_37/38)
-            "total_taxes_before_adjustments": "topmostSubform[0].Page1[0].f1_37[0]",
+            "total_taxes_before_adjustments_dollars": "topmostSubform[0].Page1[0].f1_37[0]",
+            "total_taxes_before_adjustments_cents": "topmostSubform[0].Page1[0].f1_38[0]",
+
+            # Line 10: Total taxes after adjustments (f1_45/46)
+            "total_taxes_after_adjustments_dollars": "topmostSubform[0].Page1[0].f1_45[0]",
+            "total_taxes_after_adjustments_cents": "topmostSubform[0].Page1[0].f1_46[0]",
+
+            # Line 12: Total taxes after adjustments and credits (f1_49/50)
+            "total_taxes_after_credits_dollars": "topmostSubform[0].Page1[0].f1_49[0]",
+            "total_taxes_after_credits_cents": "topmostSubform[0].Page1[0].f1_50[0]",
+
+            # Line 14: Balance Due (f1_53/54)
+            "balance_due_dollars": "topmostSubform[0].Page1[0].f1_53[0]",
+            "balance_due_cents": "topmostSubform[0].Page1[0].f1_54[0]",
         },
         "940": {
             # Form 940 (2023)
