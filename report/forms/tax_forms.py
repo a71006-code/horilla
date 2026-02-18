@@ -13,7 +13,7 @@ class TaxFormFiller:
     
     FORM_MAPPINGS = {
         "941": {
-            # Form 941 (Rev. 2026/2024 XFA) - UPDATED based on your draft scan
+            # Form 941 (Rev. 2026/2024 XFA) - UPDATED FOR 2026 DRAFT (2-field per box)
             "employer_ein": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_1[0]",
             "employer_name": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_2[0]",
             "employer_address": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_4[0]", # Street
@@ -21,25 +21,24 @@ class TaxFormFiller:
             "employer_state": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_7[0]",
             "employer_zip": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_8[0]",
             
-            # Line 1: Number of employees
+            # Line 1: Number of employees (Single field)
             "employee_count": "topmostSubform[0].Page1[0].f1_12[0]",
-            # Line 2: Wages, tips, other compensation
+            
+            # Line 2: Wages (Uses f1_13/f1_14 - we put total in f1_13)
             "total_wages": "topmostSubform[0].Page1[0].f1_13[0]",
-            # Line 3: Federal income tax withheld
-            "federal_income_tax": "topmostSubform[0].Page1[0].f1_14[0]",
+            # Line 3: FIT (Uses f1_15/f1_16 - we put total in f1_15)
+            "federal_income_tax": "topmostSubform[0].Page1[0].f1_15[0]",
             
-            # Line 5a: Column 1 (Wages)
-            "taxable_social_security_wages": "topmostSubform[0].Page1[0].f1_15[0]",
-            # Line 5a: Column 2 (Tax)
-            "taxable_social_security_tax": "topmostSubform[0].Page1[0].f1_16[0]",
+            # Line 5a: SS Wages (Col 1: f1_17/18, Col 2: f1_19/20)
+            "taxable_social_security_wages": "topmostSubform[0].Page1[0].f1_17[0]",
+            "taxable_social_security_tax": "topmostSubform[0].Page1[0].f1_19[0]",
             
-            # Line 5c: Column 1 (Wages)
-            "taxable_medicare_wages": "topmostSubform[0].Page1[0].f1_19[0]",
-            # Line 5c: Column 2 (Tax)
-            "taxable_medicare_tax": "topmostSubform[0].Page1[0].f1_20[0]",
+            # Line 5c: Medicare (Col 1: f1_25/26, Col 2: f1_27/28)
+            "taxable_medicare_wages": "topmostSubform[0].Page1[0].f1_25[0]",
+            "taxable_medicare_tax": "topmostSubform[0].Page1[0].f1_27[0]",
             
-            # Line 6: Total taxes before adjustments
-            "total_taxes_before_adjustments": "topmostSubform[0].Page1[0].f1_26[0]",
+            # Line 6: Total Taxes (f1_37/38)
+            "total_taxes_before_adjustments": "topmostSubform[0].Page1[0].f1_37[0]",
         },
         "940": {
             # Form 940 (2023)
