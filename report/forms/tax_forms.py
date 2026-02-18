@@ -78,11 +78,11 @@ class TaxFormFiller:
             self.forms_dir = os.path.join(settings.BASE_DIR, "report", "static", "report", "forms")
             
             # Fallback for Docker production where BASE_DIR might differ
-            if not os.path.exists(self.forms_dir):
+            if not os.path.exists(self.forms_dir) or not os.path.exists(os.path.join(self.forms_dir, "f941.pdf")):
                 self.forms_dir = "/app/report/static/report/forms"
             
             # Local debug path for dev environment
-            if not os.path.exists(self.forms_dir):
+            if not os.path.exists(self.forms_dir) or not os.path.exists(os.path.join(self.forms_dir, "f941.pdf")):
                 self.forms_dir = "/home/ubuntu/.gemini/antigravity/scratch/horilla/report/static/report/forms"
 
     def fill_form(self, form_type, data):
