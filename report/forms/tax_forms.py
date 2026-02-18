@@ -13,7 +13,7 @@ class TaxFormFiller:
     
     FORM_MAPPINGS = {
         "941": {
-            # Form 941 (Rev. 2026/2024 XFA) - CORRECTED PATHS based on dump
+            # Form 941 (Rev. 2026/2024 XFA) - UPDATED based on your draft scan
             "employer_ein": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_1[0]",
             "employer_name": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_2[0]",
             "employer_address": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_4[0]", # Street
@@ -27,14 +27,19 @@ class TaxFormFiller:
             "total_wages": "topmostSubform[0].Page1[0].f1_13[0]",
             # Line 3: Federal income tax withheld
             "federal_income_tax": "topmostSubform[0].Page1[0].f1_14[0]",
-            # Line 5a: Taxable social security wages (Column 1)
+            
+            # Line 5a: Column 1 (Wages)
             "taxable_social_security_wages": "topmostSubform[0].Page1[0].f1_15[0]",
-            # Line 5a: Taxable social security wages (Column 2)
+            # Line 5a: Column 2 (Tax)
             "taxable_social_security_tax": "topmostSubform[0].Page1[0].f1_16[0]",
-            # Line 5c: Taxable Medicare wages (Column 1)
+            
+            # Line 5c: Column 1 (Wages)
             "taxable_medicare_wages": "topmostSubform[0].Page1[0].f1_19[0]",
-            # Line 5c: Taxable Medicare wages (Column 2)
+            # Line 5c: Column 2 (Tax)
             "taxable_medicare_tax": "topmostSubform[0].Page1[0].f1_20[0]",
+            
+            # Line 6: Total taxes before adjustments
+            "total_taxes_before_adjustments": "topmostSubform[0].Page1[0].f1_26[0]",
         },
         "940": {
             # Form 940 (2023)
