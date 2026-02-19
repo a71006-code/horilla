@@ -20,13 +20,13 @@ class TaxFormFiller:
             "employer_trade_name": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_4[0]",
             
             # Address Mapping Corrected for March 2026 Draft
-            "employer_address": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_5[0]",
-            "employer_city": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_6[0]",
-            "employer_state": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_7[0]",
-            "employer_zip": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_8[0]",
-            "foreign_country": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_9[0]",
-            "foreign_province": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_10[0]",
-            "foreign_postal_code": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_11[0]",
+            "employer_address_number": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_5[0]",
+            "employer_address_street": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_6[0]",
+            "employer_address_suite": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_7[0]",
+            "employer_city": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_8[0]",
+            "employer_state": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_9[0]",
+            "employer_zip": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_10[0]",
+            "foreign_country": "topmostSubform[0].Page1[0].Header[0].EntityArea[0].f1_11[0]",
             
             # Quarter Checkboxes (c1_1[0-3])
             "quarter_1": "topmostSubform[0].Page1[0].Header[0].ReportForQuarter[0].c1_1[0]",

@@ -643,14 +643,24 @@ if apps.is_installed("payroll"):
 
         # Prepare granular address for forms that need it (e.g. 941)
         # and combined for others
+        emp_addr = getattr(comp, "address", "")
         emp_city = getattr(comp, "city", "") if comp else ""
         emp_state = getattr(comp, "state", "") if comp else ""
         emp_zip = getattr(comp, "zip", "") if comp else ""
 
+        # Address Parsing for 941 (Number, Street, Suite)
+        # Simple heuristic: Split by first space for 'Number'
+        addr_parts = emp_addr.split(" ", 1)
+        addr_number = addr_parts[0] if len(addr_parts) > 0 else ""
+        addr_street = addr_parts[1] if len(addr_parts) > 1 else ""
+        addr_suite = "" # Usually in a separate field if available, or parsed from end
+
         # Helper to split dollars and cents
         def split_amt(val):
             v = round(float(val or 0), 2)
-            sign = "-" if v < 0 else ""
+            sign = ""
+            if v < 0:
+                 sign = "-"
             dollars = int(abs(v))
             cents = int(round((abs(v) - dollars) * 100))
             return f"{sign}{dollars}", f"{cents:02d}"
@@ -675,12 +685,14 @@ if apps.is_installed("payroll"):
         today = datetime.date.today()
         reference_date = start_date_from or end_date_from or start_date_to or end_date_to or today
         quarter_idx = (reference_date.month - 1) // 3
-        quarter_months = [quarter_idx * 3 + 1, quarter_idx * 3 + 2, quarter_idx * 3 + 3]
+        
+        # Quarter Checkboxes (PDF often expects "1" or "Yes" for XFA checkboxes)
+        q_val = "Yes"
         q_map = {"quarter_1": "", "quarter_2": "", "quarter_3": "", "quarter_4": ""}
-        if quarter_idx == 0: q_map["quarter_1"] = "1"
-        elif quarter_idx == 1: q_map["quarter_2"] = "1"
-        elif quarter_idx == 2: q_map["quarter_3"] = "1"
-        else: q_map["quarter_4"] = "1"
+        if quarter_idx == 0: q_map["quarter_1"] = q_val
+        elif quarter_idx == 1: q_map["quarter_2"] = q_val
+        elif quarter_idx == 2: q_map["quarter_3"] = q_val
+        else: q_map["quarter_4"] = q_val
 
         # Map All Numeric Fields to Split Format
         w_d, w_c = split_amt(total_gross)
@@ -710,6 +722,7 @@ if apps.is_installed("payroll"):
         month3_manual = parse_amount_param("monthly_tax_liability_month3")
         quarter_total_manual = parse_amount_param("quarter_total_tax_liability")
 
+        quarter_months = [quarter_idx * 3 + 1, quarter_idx * 3 + 2, quarter_idx * 3 + 3]
         month_liabilities = [0.0, 0.0, 0.0]
         if any(v is not None for v in [month1_manual, month2_manual, month3_manual]):
             month_liabilities = [month1_manual or 0.0, month2_manual or 0.0, month3_manual or 0.0]
@@ -745,14 +758,14 @@ if apps.is_installed("payroll"):
 
         third_party_choice = str(request.GET.get("third_party_designee", "")).strip().lower()
         if third_party_choice == "yes":
-            third_party_yes = "1"
+            third_party_yes = "Yes"
             third_party_no = ""
         elif third_party_choice == "no":
             third_party_yes = ""
-            third_party_no = "1"
+            third_party_no = "Yes"
         else:
             third_party_yes = ""
-            third_party_no = "1"
+            third_party_no = "Yes"
 
         ein_digits = "".join(ch for ch in str(employer_ein or "") if ch.isdigit())
         ein_part1 = ein_digits[:2]
@@ -761,7 +774,9 @@ if apps.is_installed("payroll"):
         data = {
             "employer_name": company_name,
             "employer_trade_name": getattr(comp, "company_trade_name", ""),
-            "employer_address": getattr(comp, "address", ""),
+            "employer_address_number": addr_number,
+            "employer_address_street": addr_street,
+            "employer_address_suite": addr_suite,
             "employer_city": emp_city,
             "employer_state": emp_state,
             "employer_zip": emp_zip,
@@ -812,9 +827,9 @@ if apps.is_installed("payroll"):
             "balance_due_cents": total_tax_c,
 
             # --- 941 Page 2 / Part 2 ---
-            "deposit_schedule_line12_less_2500": "1" if deposit_schedule == "line12_less_2500" else "",
-            "deposit_schedule_monthly": "1" if deposit_schedule == "monthly" else "",
-            "deposit_schedule_semiweekly": "1" if deposit_schedule == "semiweekly" else "",
+            "deposit_schedule_line12_less_2500": "Yes" if deposit_schedule == "line12_less_2500" else "",
+            "deposit_schedule_monthly": "Yes" if deposit_schedule == "monthly" else "",
+            "deposit_schedule_semiweekly": "Yes" if deposit_schedule == "semiweekly" else "",
             "month_1_tax_liability_dollars": month1_d if deposit_schedule == "monthly" else "",
             "month_1_tax_liability_cents": month1_c if deposit_schedule == "monthly" else "",
             "month_2_tax_liability_dollars": month2_d if deposit_schedule == "monthly" else "",
@@ -825,9 +840,9 @@ if apps.is_installed("payroll"):
             "quarter_total_tax_liability_cents": qtotal_c if deposit_schedule == "monthly" else "",
 
             # --- 941 Page 2 / Part 3 ---
-            "business_closed_or_stopped_paying_wages": "1" if business_closed else "",
+            "business_closed_or_stopped_paying_wages": "Yes" if business_closed else "",
             "final_date_wages_paid": final_wage_date_str,
-            "seasonal_employer": "1" if seasonal_employer else "",
+            "seasonal_employer": "Yes" if seasonal_employer else "",
 
             # --- 941 Page 2 / Part 4 ---
             "third_party_designee_yes": third_party_yes,
@@ -840,7 +855,7 @@ if apps.is_installed("payroll"):
             "signer_name": request.GET.get("signer_name", company_name),
             "signer_title": request.GET.get("signer_title", ""),
             "signer_daytime_phone": request.GET.get("signer_daytime_phone", ""),
-            "paid_preparer_self_employed": "1" if parse_bool_param("paid_preparer_self_employed", default=False) else "",
+            "paid_preparer_self_employed": "Yes" if parse_bool_param("paid_preparer_self_employed", default=False) else "",
             "paid_preparer_name": request.GET.get("paid_preparer_name", ""),
             "paid_preparer_ptin": request.GET.get("paid_preparer_ptin", ""),
             "paid_preparer_firm_name": request.GET.get("paid_preparer_firm_name", ""),
