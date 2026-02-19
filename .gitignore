@@ -133,8 +133,7 @@ dmypy.json
 # migration files
 **/migrations/**
 !**/migrations
-!**/migrations/__init__.py
-!payroll/migrations/*.py
+!**/migrations/*.py
 
 # media file
 media/
