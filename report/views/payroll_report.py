@@ -762,10 +762,11 @@ if apps.is_installed("payroll"):
             "employer_name": company_name,
             "employer_trade_name": getattr(comp, "company_trade_name", ""),
             "employer_address": getattr(comp, "address", ""),
-            "employer_address_line2": "", # Optional street continuation
             "employer_city": emp_city,
             "employer_state": emp_state,
             "employer_zip": emp_zip,
+            "employer_ein_part1": ein_part1,
+            "employer_ein_part2": ein_part2,
             "employer_ein": employer_ein,
             "employer_name_page2": company_name,
             "employer_ein_page2_part1": ein_part1,
