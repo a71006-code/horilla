@@ -752,6 +752,8 @@ if apps.is_installed("payroll"):
         medt_d, medt_c = split_amt(medt_val)
         total_ssmed_d, total_ssmed_c = split_amt(total_ssmed_val)
         total_tax_d, total_tax_c = split_amt(total_tax_val)
+        futa_w_d, futa_w_c = split_amt(aggregates["940"]["total_futa_wages"])
+        futa_l_d, futa_l_c = split_amt(aggregates["940"]["futa_liability"])
 
         # Part 2 (Deposit Schedule) automation
         deposit_schedule = str(request.GET.get("deposit_schedule", "")).strip().lower()
@@ -939,8 +941,12 @@ if apps.is_installed("payroll"):
             "voucher_address": getattr(comp, "address", ""),
             "voucher_city_state_zip": f"{emp_city}, {emp_state} {emp_zip}",
 
-            "total_futa_wages": round(aggregates["940"]["total_futa_wages"], 2),
-            "futa_liability": round(aggregates["940"]["futa_liability"], 2),
+            "total_futa_wages_dollars": futa_w_d,
+            "total_futa_wages_cents": futa_w_c,
+            "futa_liability_dollars": futa_l_d,
+            "futa_liability_cents": futa_l_c,
+            "futa_liability_total_dollars": futa_l_d,
+            "futa_liability_total_cents": futa_l_c,
 
             "pit_wages": round(aggregates["DE9"]["pit_wages"], 2),
             "pit_withheld": round(aggregates["DE9"]["pit_withheld"], 2),
@@ -950,6 +956,11 @@ if apps.is_installed("payroll"):
             "ett_tax": round(aggregates["DE9"]["ett_tax"], 2),
             "sdi_wages": round(aggregates["DE9"]["sdi_wages"], 2),
             "sdi_tax": round(aggregates["DE9"]["sdi_tax"], 2),
+            "total_wages": round(total_gross, 2),
+            "quarter": f"{quarter_idx + 1}",
+            "year": f"{reference_date.year}",
+            "quarter_ended": f"{(quarter_idx + 1) * 3}/{(reference_date.month % 3 or 3)}/{reference_date.year}",
+
             "employees": []
         }
 

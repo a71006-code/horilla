@@ -143,12 +143,28 @@ class TaxFormFiller:
             # Form 940 (2023)
             # XFA paths based on inspection
             "employer_name": "topmostSubform[0].Page1[0].EmployerName[0].f1_2[0]",
-            "employer_ein": "topmostSubform[0].Page1[0].EIN[0].f1_4[0]",
+            "employer_ein_part1": "topmostSubform[0].Page1[0].EIN[0].f1_3[0]",
+            "employer_ein_part2": "topmostSubform[0].Page1[0].EIN[0].f1_4[0]",
             "employer_address": "topmostSubform[0].Page1[0].Address[0].f1_5[0]",
             "employer_city": "topmostSubform[0].Page1[0].City[0].f1_6[0]",
             "employer_state": "topmostSubform[0].Page1[0].State[0].f1_7[0]", 
             "employer_zip": "topmostSubform[0].Page1[0].Zip[0].f1_8[0]",
-            "futa_liability": "topmostSubform[0].Page1[0].f1_38[0]", # Line 12 Total FUTA Tax
+            
+            # Line 3: Total wages (Col 1: f1_17/18)
+            "total_wages_dollars": "topmostSubform[0].Page1[0].f1_17[0]",
+            "total_wages_cents": "topmostSubform[0].Page1[0].f1_18[0]",
+
+            # Line 7: Total FUTA taxable wages (Col 1: f1_28/29)
+            "total_futa_wages_dollars": "topmostSubform[0].Page1[0].f1_28[0]",
+            "total_futa_wages_cents": "topmostSubform[0].Page1[0].f1_29[0]",
+
+            # Line 8: FUTA Tax (Col 1: f1_30/31)
+            "futa_liability_dollars": "topmostSubform[0].Page1[0].f1_30[0]",
+            "futa_liability_cents": "topmostSubform[0].Page1[0].f1_31[0]",
+
+            # Line 12: Total FUTA tax (f1_38/39)
+            "futa_liability_total_dollars": "topmostSubform[0].Page1[0].f1_38[0]",
+            "futa_liability_total_cents": "topmostSubform[0].Page1[0].f1_39[0]",
         },
         "DE9": {
             # CA DE 9 (AcroForm - Simple Names)
@@ -160,9 +176,15 @@ class TaxFormFiller:
             "employer_zip": "ZIP Code",
             "quarter": "Quarter",
             "year": "Year",
+            
+            # Column Mapping
             "total_wages": "Total Subject Wages", 
             "pit_wages": "PIT Wages",
             "pit_withheld": "PIT Withheld",
+            "ui_wages": "UI Subject Wages",
+            "ui_tax": "UI Tax",
+            "ett_tax": "ETT Tax",
+            "sdi_tax": "SDI Withheld",
         },
         "DE9C": {
              # CA DE 9C (Continuation)
