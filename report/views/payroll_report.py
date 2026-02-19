@@ -850,6 +850,19 @@ if apps.is_installed("payroll"):
             "paid_preparer_state": request.GET.get("paid_preparer_state", ""),
             "paid_preparer_zip": request.GET.get("paid_preparer_zip", ""),
 
+            # --- 941-V (Voucher) ---
+            "voucher_ein_part1": ein_part1,
+            "voucher_ein_part2": ein_part2,
+            "voucher_amount_dollars": total_tax_d,
+            "voucher_amount_cents": total_tax_c,
+            "voucher_q1": q_map["quarter_1"],
+            "voucher_q2": q_map["quarter_2"],
+            "voucher_q3": q_map["quarter_3"],
+            "voucher_q4": q_map["quarter_4"],
+            "voucher_business_name": company_name,
+            "voucher_address": getattr(comp, "address", ""),
+            "voucher_city_state_zip": f"{emp_city}, {emp_state} {emp_zip}",
+
             # --- 940 Data ---
             "total_futa_wages": round(aggregates["940"]["total_futa_wages"], 2),
             "futa_liability": round(aggregates["940"]["futa_liability"], 2),
