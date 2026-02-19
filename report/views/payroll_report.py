@@ -9,6 +9,25 @@ if apps.is_installed("payroll"):
     from horilla.decorators import login_required, permission_required
     from payroll.filters import PayslipFilter
     from payroll.models.models import Payslip
+    from payroll.models.tax_models import PayrollSettings
+
+    def _get_selected_company(request):
+        selected_company = request.session.get("selected_company")
+        if not selected_company or selected_company == "all":
+            return None
+        return Company.objects.filter(id=selected_company).first()
+
+    def _get_payroll_settings(request, create=False):
+        company = _get_selected_company(request)
+        if company:
+            if create:
+                settings, _ = PayrollSettings.objects.get_or_create(company_id=company)
+                return settings
+            return PayrollSettings.objects.filter(company_id=company).first()
+        if create:
+            settings, _ = PayrollSettings.objects.get_or_create(company_id=None)
+            return settings
+        return PayrollSettings.objects.filter(company_id=None).first() or PayrollSettings.objects.first()
 
     @login_required
     @permission_required(perm="payroll.view_payslip")
@@ -26,11 +45,48 @@ if apps.is_installed("payroll"):
             )
 
         filter_form = PayslipFilter(request.GET, payslips)
+        tax_settings = _get_payroll_settings(request, create=False)
 
         return render(
             request,
             "report/payroll_report.html",
-            {"company": company, "f": filter_form},
+            {"company": company, "f": filter_form, "tax_settings": tax_settings},
+        )
+
+    @login_required
+    @permission_required(perm="payroll.view_payslip")
+    def update_tax_settings(request):
+        if request.method != "POST":
+            return JsonResponse(
+                {"success": False, "message": "Only POST method is allowed."}, status=405
+            )
+
+        settings = _get_payroll_settings(request, create=True)
+
+        settings.tax_designee_name = request.POST.get("third_party_designee_name", "").strip()
+        settings.tax_designee_phone = request.POST.get("third_party_designee_phone", "").strip()
+        settings.tax_designee_pin = request.POST.get("third_party_designee_pin", "").strip()
+        settings.tax_signer_name = request.POST.get("signer_name", "").strip()
+        settings.tax_signer_title = request.POST.get("signer_title", "").strip()
+        settings.tax_signer_phone = request.POST.get("signer_daytime_phone", "").strip()
+        settings.tax_seasonal_employer = str(
+            request.POST.get("seasonal_employer", "")
+        ).strip().lower() in {"1", "true", "yes", "on", "y"}
+
+        settings.save(
+            update_fields=[
+                "tax_designee_name",
+                "tax_designee_phone",
+                "tax_designee_pin",
+                "tax_signer_name",
+                "tax_signer_title",
+                "tax_signer_phone",
+                "tax_seasonal_employer",
+            ]
+        )
+
+        return JsonResponse(
+            {"success": True, "message": "Tax settings saved successfully."}
         )
 
     @login_required
@@ -625,6 +681,7 @@ if apps.is_installed("payroll"):
             # Assuming EIN might be in a field or just default for now as it's not standard on Company model usually?
             # We'll check if there's a field for tax id, otherwise leave blank
             employer_ein = getattr(comp, "company_registration_number", "00-0000000")
+        tax_settings = _get_payroll_settings(request, create=False)
 
         # Aggregate Data using Unified Logic
         from payroll.methods.tax_reporting import calculate_tax_liability
@@ -670,6 +727,10 @@ if apps.is_installed("payroll"):
             if raw == "":
                 return default
             return str(raw).strip().lower() in {"1", "true", "yes", "on", "y"}
+
+        def parse_text_param(name, default=""):
+            raw = str(request.GET.get(name, "")).strip()
+            return raw if raw else default
 
         def parse_amount_param(name):
             raw = str(request.GET.get(name, "")).strip()
@@ -752,7 +813,12 @@ if apps.is_installed("payroll"):
 
         # Part 3 / 4 / 5 controls
         business_closed = parse_bool_param("business_closed", default=False)
-        seasonal_employer = parse_bool_param("seasonal_employer", default=False)
+        seasonal_employer = parse_bool_param(
+            "seasonal_employer",
+            default=bool(
+                getattr(tax_settings, "tax_seasonal_employer", False) if tax_settings else False
+            ),
+        )
         final_wage_date = parse_date(request.GET.get("final_wage_date", ""))
         final_wage_date_str = final_wage_date.strftime("%m/%d/%Y") if final_wage_date else ""
 
@@ -766,6 +832,33 @@ if apps.is_installed("payroll"):
         else:
             third_party_yes = ""
             third_party_no = "Yes"
+
+        designee_name = parse_text_param(
+            "third_party_designee_name",
+            default=getattr(tax_settings, "tax_designee_name", "") if tax_settings else "",
+        )
+        designee_phone = parse_text_param(
+            "third_party_designee_phone",
+            default=getattr(tax_settings, "tax_designee_phone", "") if tax_settings else "",
+        )
+        designee_pin = parse_text_param(
+            "third_party_designee_pin",
+            default=getattr(tax_settings, "tax_designee_pin", "") if tax_settings else "",
+        )
+        signer_name = parse_text_param(
+            "signer_name",
+            default=(
+                getattr(tax_settings, "tax_signer_name", "") if tax_settings else ""
+            ) or company_name,
+        )
+        signer_title = parse_text_param(
+            "signer_title",
+            default=getattr(tax_settings, "tax_signer_title", "") if tax_settings else "",
+        )
+        signer_daytime_phone = parse_text_param(
+            "signer_daytime_phone",
+            default=getattr(tax_settings, "tax_signer_phone", "") if tax_settings else "",
+        )
 
         ein_digits = "".join(ch for ch in str(employer_ein or "") if ch.isdigit())
         ein_part1 = ein_digits[:2]
@@ -846,15 +939,15 @@ if apps.is_installed("payroll"):
 
             # --- 941 Page 2 / Part 4 ---
             "third_party_designee_yes": third_party_yes,
-            "third_party_designee_name": request.GET.get("third_party_designee_name", ""),
-            "third_party_designee_phone": request.GET.get("third_party_designee_phone", ""),
-            "third_party_designee_pin": request.GET.get("third_party_designee_pin", ""),
+            "third_party_designee_name": designee_name,
+            "third_party_designee_phone": designee_phone,
+            "third_party_designee_pin": designee_pin,
             "third_party_designee_no": third_party_no,
 
             # --- 941 Page 2 / Part 5 ---
-            "signer_name": request.GET.get("signer_name", company_name),
-            "signer_title": request.GET.get("signer_title", ""),
-            "signer_daytime_phone": request.GET.get("signer_daytime_phone", ""),
+            "signer_name": signer_name,
+            "signer_title": signer_title,
+            "signer_daytime_phone": signer_daytime_phone,
             "paid_preparer_self_employed": "Yes" if parse_bool_param("paid_preparer_self_employed", default=False) else "",
             "paid_preparer_name": request.GET.get("paid_preparer_name", ""),
             "paid_preparer_ptin": request.GET.get("paid_preparer_ptin", ""),

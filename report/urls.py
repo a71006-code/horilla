@@ -69,6 +69,11 @@ if apps.is_installed("payroll"):
                 payroll_report.download_tax_forms, 
                 name="download-tax-forms"
             ),
+            path(
+                "update-tax-settings",
+                payroll_report.update_tax_settings,
+                name="update-tax-settings",
+            ),
         ]
     )
 

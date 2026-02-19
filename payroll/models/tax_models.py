@@ -31,6 +31,13 @@ class PayrollSettings(HorillaModel):
     position = models.CharField(
         max_length=15, null=True, choices=choices, default="postfix"
     )
+    tax_designee_name = models.CharField(max_length=255, blank=True)
+    tax_designee_phone = models.CharField(max_length=20, blank=True)
+    tax_designee_pin = models.CharField(max_length=5, blank=True)
+    tax_signer_name = models.CharField(max_length=255, blank=True)
+    tax_signer_title = models.CharField(max_length=255, blank=True)
+    tax_signer_phone = models.CharField(max_length=20, blank=True)
+    tax_seasonal_employer = models.BooleanField(default=False)
 
     company_id = models.ForeignKey(Company, null=True, on_delete=models.PROTECT)
     objects = HorillaCompanyManager("company_id")

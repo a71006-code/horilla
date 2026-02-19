@@ -162,7 +162,7 @@
                                                 <div class="col-sm-4 d-flex align-items-end">
                                                     <div class="oh-input-group">
                                                         <label class="oh-label" for="seasonal_employer">
-                                                            <input type="checkbox" id="seasonal_employer" name="seasonal_employer">
+                                                            <input type="checkbox" id="seasonal_employer" name="seasonal_employer" {% if tax_settings and tax_settings.tax_seasonal_employer %}checked{% endif %}>
                                                             {% trans "Seasonal employer (Part 3)" %}
                                                         </label>
                                                     </div>
@@ -180,7 +180,7 @@
                                                 <div class="col-sm-4">
                                                     <div class="oh-input-group">
                                                         <label class="oh-label" for="third_party_designee_pin">{% trans "Designee PIN" %}</label>
-                                                        <input class="oh-input w-100" type="text" maxlength="5" name="third_party_designee_pin" id="third_party_designee_pin">
+                                                        <input class="oh-input w-100" type="text" maxlength="5" name="third_party_designee_pin" id="third_party_designee_pin" value="{{ tax_settings.tax_designee_pin|default_if_none:'' }}">
                                                     </div>
                                                 </div>
                                             </div>
@@ -188,13 +188,13 @@
                                                 <div class="col-sm-6">
                                                     <div class="oh-input-group">
                                                         <label class="oh-label" for="third_party_designee_name">{% trans "Designee Name" %}</label>
-                                                        <input class="oh-input w-100" type="text" name="third_party_designee_name" id="third_party_designee_name">
+                                                        <input class="oh-input w-100" type="text" name="third_party_designee_name" id="third_party_designee_name" value="{{ tax_settings.tax_designee_name|default_if_none:'' }}">
                                                     </div>
                                                 </div>
                                                 <div class="col-sm-6">
                                                     <div class="oh-input-group">
                                                         <label class="oh-label" for="third_party_designee_phone">{% trans "Designee Phone" %}</label>
-                                                        <input class="oh-input w-100" type="text" name="third_party_designee_phone" id="third_party_designee_phone">
+                                                        <input class="oh-input w-100" type="text" name="third_party_designee_phone" id="third_party_designee_phone" value="{{ tax_settings.tax_designee_phone|default_if_none:'' }}">
                                                     </div>
                                                 </div>
                                             </div>
@@ -202,20 +202,27 @@
                                                 <div class="col-sm-4">
                                                     <div class="oh-input-group">
                                                         <label class="oh-label" for="signer_name">{% trans "Signer Name (Part 5)" %}</label>
-                                                        <input class="oh-input w-100" type="text" name="signer_name" id="signer_name">
+                                                        <input class="oh-input w-100" type="text" name="signer_name" id="signer_name" value="{{ tax_settings.tax_signer_name|default_if_none:'' }}">
                                                     </div>
                                                 </div>
                                                 <div class="col-sm-4">
                                                     <div class="oh-input-group">
                                                         <label class="oh-label" for="signer_title">{% trans "Signer Title" %}</label>
-                                                        <input class="oh-input w-100" type="text" name="signer_title" id="signer_title">
+                                                        <input class="oh-input w-100" type="text" name="signer_title" id="signer_title" value="{{ tax_settings.tax_signer_title|default_if_none:'' }}">
                                                     </div>
                                                 </div>
                                                 <div class="col-sm-4">
                                                     <div class="oh-input-group">
                                                         <label class="oh-label" for="signer_daytime_phone">{% trans "Signer Daytime Phone" %}</label>
-                                                        <input class="oh-input w-100" type="text" name="signer_daytime_phone" id="signer_daytime_phone">
+                                                        <input class="oh-input w-100" type="text" name="signer_daytime_phone" id="signer_daytime_phone" value="{{ tax_settings.tax_signer_phone|default_if_none:'' }}">
                                                     </div>
+                                                </div>
+                                            </div>
+                                            <div class="row mt-2">
+                                                <div class="col-sm-12">
+                                                    <button type="button" class="oh-btn oh-btn--secondary oh-btn--small" id="save-tax-settings-btn">
+                                                        {% trans "Save as Default" %}
+                                                    </button>
                                                 </div>
                                             </div>
                                             <div class="row">
@@ -801,6 +808,34 @@
             const formData = $("#filterForm").serialize();
             // window.location.href handles the download
             window.location.href = `download-tax-forms?${formData}`;
+        });
+        $("#save-tax-settings-btn").on("click", function (e) {
+            e.preventDefault();
+            const payload = {
+                third_party_designee_name: $("#third_party_designee_name").val(),
+                third_party_designee_phone: $("#third_party_designee_phone").val(),
+                third_party_designee_pin: $("#third_party_designee_pin").val(),
+                signer_name: $("#signer_name").val(),
+                signer_title: $("#signer_title").val(),
+                signer_daytime_phone: $("#signer_daytime_phone").val(),
+                seasonal_employer: $("#seasonal_employer").is(":checked"),
+            };
+
+            $.ajax({
+                url: "{% url 'update-tax-settings' %}",
+                method: "POST",
+                data: payload,
+                headers: { "X-CSRFToken": "{{ csrf_token }}" },
+                success: function () {
+                    $("#save-tax-settings-btn").text("{% trans 'Saved' %}");
+                    setTimeout(function () {
+                        $("#save-tax-settings-btn").text("{% trans 'Save as Default' %}");
+                    }, 1200);
+                },
+                error: function () {
+                    alert("{% trans 'Unable to save tax settings right now.' %}");
+                }
+            });
         });
     });
 
