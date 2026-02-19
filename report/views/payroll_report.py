@@ -4,12 +4,15 @@ from django.shortcuts import render
 from django.utils.dateparse import parse_date
 
 if apps.is_installed("payroll"):
+    import base64
 
     from base.models import Company
     from horilla.decorators import login_required, permission_required
     from payroll.filters import PayslipFilter
     from payroll.models.models import Payslip
     from payroll.models.tax_models import PayrollSettings
+
+    TAX_FORM_TYPES = ("941", "940", "DE9", "DE9C")
 
     def _get_selected_company(request):
         selected_company = request.session.get("selected_company")
@@ -629,22 +632,17 @@ if apps.is_installed("payroll"):
 
     @login_required
     @permission_required(perm="payroll.view_payslip")
-    def download_tax_forms(request):
-        import io
-        import zipfile
-        from django.http import HttpResponse
-        from report.forms.tax_forms import TaxFormFiller
+    def _build_tax_form_data(request):
         from django.db.models import Sum
+        from payroll.methods.tax_reporting import calculate_tax_liability
 
-        # Filter Logic (Simplified overlap with payroll_pivot logic)
         payslips = Payslip.objects.all()
-        
-        # Apply company filter if selected
         selected_company = request.session.get("selected_company")
         if selected_company and selected_company != "all":
-             payslips = payslips.filter(employee_id__employee_work_info__company_id=selected_company)
+            payslips = payslips.filter(
+                employee_id__employee_work_info__company_id=selected_company
+            )
 
-        # Apply basic date filters directly from request
         start_date_from = parse_date(request.GET.get("start_date_from", ""))
         start_date_to = parse_date(request.GET.get("start_date_till", ""))
         if start_date_from:
@@ -659,8 +657,6 @@ if apps.is_installed("payroll"):
         if end_date_to:
             payslips = payslips.filter(end_date__lte=end_date_to)
 
-        # Retrieve Company Info
-        from base.models import Company
         comp = None
         company_name = "Horilla HR"
         company_address = "123 Business Rd"
@@ -668,56 +664,38 @@ if apps.is_installed("payroll"):
 
         if selected_company and selected_company != "all":
             comp = Company.objects.filter(id=selected_company).first()
-        
         if not comp:
-             # Fallback to first company if exists, or defaults
-             comp = Company.objects.first()
-        
+            comp = Company.objects.first()
+
         if comp:
             company_name = comp.company
-            # Construct address if available
             addr_parts = [comp.address, comp.city, comp.state, comp.zip, comp.country]
             company_address = ", ".join([p for p in addr_parts if p])
-            # Assuming EIN might be in a field or just default for now as it's not standard on Company model usually?
-            # We'll check if there's a field for tax id, otherwise leave blank
             employer_ein = getattr(comp, "company_registration_number", "00-0000000")
         tax_settings = _get_payroll_settings(request, create=False)
 
-        # Aggregate Data using Unified Logic
-        from payroll.methods.tax_reporting import calculate_tax_liability
-        
-        # Calculate Taxes
-        # We pass the company object (comp) if available, though currently not used by calc logic
-        result = calculate_tax_liability(payslips, company=comp if selected_company and selected_company != "all" else None)
-        
+        result = calculate_tax_liability(
+            payslips, company=comp if selected_company and selected_company != "all" else None
+        )
         aggregates = result["form_aggregates"]
-        
-        # Calculate Total Gross for summary
         total_gross = payslips.aggregate(Sum("gross_pay"))["gross_pay__sum"] or 0.0
-
-        # Calculate Employee Count for 941 Line 1
         employee_count = payslips.values("employee_id").distinct().count()
 
-        # Prepare granular address for forms that need it (e.g. 941)
-        # and combined for others
         emp_addr = getattr(comp, "address", "")
         emp_city = getattr(comp, "city", "") if comp else ""
         emp_state = getattr(comp, "state", "") if comp else ""
         emp_zip = getattr(comp, "zip", "") if comp else ""
 
-        # Address Parsing for 941 (Number, Street, Suite)
-        # Simple heuristic: Split by first space for 'Number'
         addr_parts = emp_addr.split(" ", 1)
         addr_number = addr_parts[0] if len(addr_parts) > 0 else ""
         addr_street = addr_parts[1] if len(addr_parts) > 1 else ""
-        addr_suite = "" # Usually in a separate field if available, or parsed from end
+        addr_suite = ""
 
-        # Helper to split dollars and cents
         def split_amt(val):
             v = round(float(val or 0), 2)
             sign = ""
             if v < 0:
-                 sign = "-"
+                sign = "-"
             dollars = int(abs(v))
             cents = int(round((abs(v) - dollars) * 100))
             return f"{sign}{dollars}", f"{cents:02d}"
@@ -741,21 +719,23 @@ if apps.is_installed("payroll"):
             except (TypeError, ValueError):
                 return None
 
-        # Quarter Logic (driven by selected period when possible)
         import datetime
+
         today = datetime.date.today()
         reference_date = start_date_from or end_date_from or start_date_to or end_date_to or today
         quarter_idx = (reference_date.month - 1) // 3
-        
-        # Quarter Checkboxes (PDF often expects "1" or "Yes" for XFA checkboxes)
+
         q_val = "Yes"
         q_map = {"quarter_1": "", "quarter_2": "", "quarter_3": "", "quarter_4": ""}
-        if quarter_idx == 0: q_map["quarter_1"] = q_val
-        elif quarter_idx == 1: q_map["quarter_2"] = q_val
-        elif quarter_idx == 2: q_map["quarter_3"] = q_val
-        else: q_map["quarter_4"] = q_val
+        if quarter_idx == 0:
+            q_map["quarter_1"] = q_val
+        elif quarter_idx == 1:
+            q_map["quarter_2"] = q_val
+        elif quarter_idx == 2:
+            q_map["quarter_3"] = q_val
+        else:
+            q_map["quarter_4"] = q_val
 
-        # Map All Numeric Fields to Split Format
         w_d, w_c = split_amt(total_gross)
         fit_val = float(aggregates["941"]["federal_income_tax"] or 0)
         ssw_val = float(aggregates["941"]["social_security_wages"] or 0)
@@ -811,7 +791,6 @@ if apps.is_installed("payroll"):
         month3_d, month3_c = split_amt(month_liabilities[2])
         qtotal_d, qtotal_c = split_amt(quarter_total_liability)
 
-        # Part 3 / 4 / 5 controls
         business_closed = parse_bool_param("business_closed", default=False)
         seasonal_employer = parse_bool_param(
             "seasonal_employer",
@@ -881,35 +860,28 @@ if apps.is_installed("payroll"):
             "employer_ein_page2_part2": ein_part2,
             "employer_account_number": employer_ein, 
             "employee_count": employee_count,
-            
-            # Quarters
+
             **q_map,
 
-            # Line 2
             "total_wages_dollars": w_d,
             "total_wages_cents": w_c,
-            
-            # Line 3
+
             "federal_income_tax_dollars": fit_d,
             "federal_income_tax_cents": fit_c,
-            
-            # Line 5a
+
             "taxable_social_security_wages_dollars": ssw_d,
             "taxable_social_security_wages_cents": ssw_c,
             "taxable_social_security_tax_dollars": sst_d,
             "taxable_social_security_tax_cents": sst_c,
-            
-            # Line 5c
+
             "taxable_medicare_wages_dollars": medw_d,
             "taxable_medicare_wages_cents": medw_c,
             "taxable_medicare_tax_dollars": medt_d,
             "taxable_medicare_tax_cents": medt_c,
-            
-            # Line 5e
+
             "total_social_security_and_medicare_tax_dollars": total_ssmed_d,
             "total_social_security_and_medicare_tax_cents": total_ssmed_c,
-            
-            # Line 6 / 10 / 12
+
             "total_taxes_before_adjustments_dollars": total_tax_d,
             "total_taxes_before_adjustments_cents": total_tax_c,
             "total_taxes_after_adjustments_dollars": total_tax_d,
@@ -919,7 +891,6 @@ if apps.is_installed("payroll"):
             "balance_due_dollars": total_tax_d,
             "balance_due_cents": total_tax_c,
 
-            # --- 941 Page 2 / Part 2 ---
             "deposit_schedule_line12_less_2500": "Yes" if deposit_schedule == "line12_less_2500" else "",
             "deposit_schedule_monthly": "Yes" if deposit_schedule == "monthly" else "",
             "deposit_schedule_semiweekly": "Yes" if deposit_schedule == "semiweekly" else "",
@@ -932,19 +903,16 @@ if apps.is_installed("payroll"):
             "quarter_total_tax_liability_dollars": qtotal_d if deposit_schedule == "monthly" else "",
             "quarter_total_tax_liability_cents": qtotal_c if deposit_schedule == "monthly" else "",
 
-            # --- 941 Page 2 / Part 3 ---
             "business_closed_or_stopped_paying_wages": "Yes" if business_closed else "",
             "final_date_wages_paid": final_wage_date_str,
             "seasonal_employer": "Yes" if seasonal_employer else "",
 
-            # --- 941 Page 2 / Part 4 ---
             "third_party_designee_yes": third_party_yes,
             "third_party_designee_name": designee_name,
             "third_party_designee_phone": designee_phone,
             "third_party_designee_pin": designee_pin,
             "third_party_designee_no": third_party_no,
 
-            # --- 941 Page 2 / Part 5 ---
             "signer_name": signer_name,
             "signer_title": signer_title,
             "signer_daytime_phone": signer_daytime_phone,
@@ -959,7 +927,6 @@ if apps.is_installed("payroll"):
             "paid_preparer_state": request.GET.get("paid_preparer_state", ""),
             "paid_preparer_zip": request.GET.get("paid_preparer_zip", ""),
 
-            # --- 941-V (Voucher) ---
             "voucher_ein_part1": ein_part1,
             "voucher_ein_part2": ein_part2,
             "voucher_amount_dollars": total_tax_d,
@@ -972,11 +939,9 @@ if apps.is_installed("payroll"):
             "voucher_address": getattr(comp, "address", ""),
             "voucher_city_state_zip": f"{emp_city}, {emp_state} {emp_zip}",
 
-            # --- 940 Data ---
             "total_futa_wages": round(aggregates["940"]["total_futa_wages"], 2),
             "futa_liability": round(aggregates["940"]["futa_liability"], 2),
-            
-            # --- DE9 Data ---
+
             "pit_wages": round(aggregates["DE9"]["pit_wages"], 2),
             "pit_withheld": round(aggregates["DE9"]["pit_withheld"], 2),
             "ui_wages": round(aggregates["DE9"]["unemployment_insurance_wages"], 2),
@@ -985,15 +950,10 @@ if apps.is_installed("payroll"):
             "ett_tax": round(aggregates["DE9"]["ett_tax"], 2),
             "sdi_wages": round(aggregates["DE9"]["sdi_wages"], 2),
             "sdi_tax": round(aggregates["DE9"]["sdi_tax"], 2),
-            
-            # --- Employee List for DE9C ---
-            "employees": [] 
+            "employees": []
         }
 
-        # Populate Employee List for DE9C
-        # We need to re-iterate payslips to get per-employee totals including valid SSN and Wages
-        emp_data = {} # emp_id -> data dict
-        
+        emp_data = {}
         for payslip in payslips:
             eid = payslip.employee_id.id
             if eid not in emp_data:
@@ -1005,47 +965,85 @@ if apps.is_installed("payroll"):
                     "pit_wages": 0.0,
                     "pit_withheld": 0.0
                 }
-            
+
             gross = float(payslip.gross_pay or 0)
             emp_data[eid]["total_wages"] += gross
-            
-            # Extract PIT from this payslip's deductions
+
             ph_data = payslip.pay_head_data or {}
             deductions = ph_data.get("pretax_deductions", []) + ph_data.get("post_tax_deductions", []) + ph_data.get("tax_deductions", [])
-            
+
             pit_amt = 0.0
             for d in deductions:
-                 # Broadened check for DE9C employee PIT
-                 title_lower = d.get("title", "").lower()
-                 if any(x in title_lower for x in ["ca tax", "california", "ca pit", "state income", "sit", "personal income", "pit"]):
-                     pit_amt += float(d.get("amount", 0))
-            
+                title_lower = d.get("title", "").lower()
+                if any(x in title_lower for x in ["ca tax", "california", "ca pit", "state income", "sit", "personal income", "pit"]):
+                    pit_amt += float(d.get("amount", 0))
+
             emp_data[eid]["pit_withheld"] += pit_amt
             if pit_amt > 0:
-                 emp_data[eid]["pit_wages"] += gross
+                emp_data[eid]["pit_wages"] += gross
 
         data["employees"] = list(emp_data.values())
+        return data
+
+    def _fill_tax_forms(form_data, form_types):
+        from report.forms.tax_forms import TaxFormFiller
 
         filler = TaxFormFiller()
+        filled_forms = {}
+        for form_type in form_types:
+            try:
+                pdf_bytes = filler.fill_form(form_type, form_data)
+            except Exception:
+                continue
+            if pdf_bytes:
+                filled_forms[form_type] = pdf_bytes
+        return filled_forms
+
+    @login_required
+    @permission_required(perm="payroll.view_payslip")
+    def download_tax_forms(request):
+        import io
+        import zipfile
+        from django.http import HttpResponse
+
+        form_data = _build_tax_form_data(request)
+        filled_forms = _fill_tax_forms(form_data, TAX_FORM_TYPES)
+
         zip_buffer = io.BytesIO()
-        has_files = False
-        
+        has_files = bool(filled_forms)
         with zipfile.ZipFile(zip_buffer, "w") as zf:
-            for form_type in ["941", "940", "DE9", "DE9C"]:
-                 try:
-                     pdf_bytes = filler.fill_form(form_type, data)
-                     if pdf_bytes:
-                         zf.writestr(f"Form_{form_type}.pdf", pdf_bytes)
-                         has_files = True
-                 except Exception:
-                     # Skip if template missing
-                     pass
-        
+            for form_type, pdf_bytes in filled_forms.items():
+                zf.writestr(f"Form_{form_type}.pdf", pdf_bytes)
+
         if not has_files:
-             # Create a dummy text file saying no templates found
-             with zipfile.ZipFile(zip_buffer, "w") as zf:
-                 zf.writestr("README.txt", "No PDF templates found in report/static/report/forms/. Please add f941.pdf, f940.pdf, etc.")
+            with zipfile.ZipFile(zip_buffer, "w") as zf:
+                zf.writestr("README.txt", "No PDF templates found in report/static/report/forms/. Please add f941.pdf, f940.pdf, etc.")
 
         response = HttpResponse(zip_buffer.getvalue(), content_type="application/zip")
         response['Content-Disposition'] = 'attachment; filename="tax_forms.zip"'
         return response
+
+    @login_required
+    @permission_required(perm="payroll.view_payslip")
+    def preview_tax_form(request):
+        form_type = str(request.GET.get("form_type", "941")).strip().upper()
+        if form_type not in TAX_FORM_TYPES:
+            return JsonResponse(
+                {"success": False, "message": f"Unsupported form_type: {form_type}"},
+                status=400,
+            )
+
+        form_data = _build_tax_form_data(request)
+        filled_forms = _fill_tax_forms(form_data, [form_type])
+        pdf_bytes = filled_forms.get(form_type)
+        if not pdf_bytes:
+            return JsonResponse(
+                {"success": False, "message": f"Unable to generate PDF for form {form_type}."},
+                status=404,
+            )
+
+        return render(
+            request,
+            "report/pdf_editor.html",
+            {"pdf_base64": base64.b64encode(pdf_bytes).decode("ascii")},
+        )

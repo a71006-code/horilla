@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Preview & Editor</title>
+    <style>
+        :root {
+            --bg: #f2f5f8;
+            --surface: #ffffff;
+            --border: #d8e1ea;
+            --text: #1c2b36;
+            --muted: #5f7487;
+            --primary: #0f6fbd;
+            --primary-soft: #e7f2fc;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        }
+
+        .page {
+            height: 100vh;
+            display: grid;
+            grid-template-rows: auto 1fr;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding: 12px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .toolbar-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+
+        .tool-btn {
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 13px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .tool-btn.active {
+            border-color: var(--primary);
+            background: var(--primary-soft);
+            color: var(--primary);
+        }
+
+        .toolbar-spacer {
+            flex: 1;
+        }
+
+        .download-btn {
+            border: 1px solid var(--primary);
+            background: var(--primary);
+            color: #fff;
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-size: 13px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .viewer-wrap {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #pdfViewer {
+            width: 100%;
+            height: 100%;
+            display: block;
+            border: 0;
+            background: #fff;
+        }
+
+        #fallbackFrame {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            display: none;
+        }
+
+        .notice {
+            position: absolute;
+            left: 12px;
+            bottom: 12px;
+            padding: 8px 10px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--muted);
+            font-size: 12px;
+            max-width: 480px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <div class="toolbar">
+        <span class="toolbar-title">PDF Editor</span>
+        <button type="button" class="tool-btn active" data-tool="text">Text</button>
+        <button type="button" class="tool-btn" data-tool="pen">Pen</button>
+        <button type="button" class="tool-btn" data-tool="highlight">Highlight</button>
+        <span class="toolbar-spacer"></span>
+        <button type="button" id="downloadEditedPdf" class="download-btn">Download Edited PDF</button>
+    </div>
+    <div class="viewer-wrap">
+        <embed-pdf-viewer id="pdfViewer"></embed-pdf-viewer>
+        <iframe id="fallbackFrame" title="PDF Preview Fallback"></iframe>
+        <div id="viewerNotice" class="notice"></div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const pdfUrl = "{{ pdf_url|default:''|escapejs }}";
+        const pdfBase64 = "{{ pdf_base64|default:''|escapejs }}";
+        const source = pdfBase64 ? ("data:application/pdf;base64," + pdfBase64) : pdfUrl;
+
+        const viewerEl = document.getElementById("pdfViewer");
+        const fallbackFrame = document.getElementById("fallbackFrame");
+        const noticeEl = document.getElementById("viewerNotice");
+        const toolButtons = document.querySelectorAll("[data-tool]");
+        const downloadBtn = document.getElementById("downloadEditedPdf");
+
+        function showNotice(message) {
+            noticeEl.textContent = message;
+            noticeEl.style.display = "block";
+        }
+
+        function callMethod(target, names) {
+            const args = Array.prototype.slice.call(arguments, 2);
+            for (let i = 0; i < names.length; i++) {
+                const fn = target && target[names[i]];
+                if (typeof fn === "function") {
+                    return fn.apply(target, args);
+                }
+            }
+            return null;
+        }
+
+        function mountFallback() {
+            if (!source) {
+                showNotice("No PDF source provided. Pass `pdf_url` or `pdf_base64` in context.");
+                return;
+            }
+            viewerEl.style.display = "none";
+            fallbackFrame.style.display = "block";
+            fallbackFrame.src = source;
+            showNotice("embed-pdf-viewer failed to load. Showing browser PDF preview fallback.");
+        }
+
+        function activateTool(toolName) {
+            toolButtons.forEach(function (btn) {
+                btn.classList.toggle("active", btn.getAttribute("data-tool") === toolName);
+            });
+            callMethod(viewerEl, ["setTool", "selectTool", "setMode", "setAnnotationTool"], toolName);
+        }
+
+        function bindTools() {
+            toolButtons.forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    activateTool(btn.getAttribute("data-tool"));
+                });
+            });
+        }
+
+        function bindDownload() {
+            downloadBtn.addEventListener("click", async function () {
+                const result = callMethod(viewerEl, ["downloadEditedPdf", "downloadPdf", "exportPdf", "savePdf", "download"]);
+
+                if (result && typeof result.then === "function") {
+                    try {
+                        const value = await result;
+                        if (value instanceof Blob) {
+                            const url = URL.createObjectURL(value);
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = "edited-document.pdf";
+                            a.click();
+                            setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+                            return;
+                        }
+                    } catch (error) {
+                        showNotice("Unable to export edited PDF.");
+                    }
+                }
+
+                if (!result && source) {
+                    const a = document.createElement("a");
+                    a.href = source;
+                    a.download = "document.pdf";
+                    a.click();
+                    showNotice("Downloaded original PDF. Library export API was not detected.");
+                }
+            });
+        }
+
+        function loadViewerScript() {
+            return new Promise(function (resolve, reject) {
+                const primary = document.createElement("script");
+                primary.src = "https://cdn.jsdelivr.net/npm/embed-pdf-viewer/dist/embed-pdf-viewer.min.js";
+                primary.onload = resolve;
+                primary.onerror = function () {
+                    const secondary = document.createElement("script");
+                    secondary.src = "https://unpkg.com/embed-pdf-viewer/dist/embed-pdf-viewer.min.js";
+                    secondary.onload = resolve;
+                    secondary.onerror = reject;
+                    document.head.appendChild(secondary);
+                };
+                document.head.appendChild(primary);
+            });
+        }
+
+        async function boot() {
+            bindTools();
+            bindDownload();
+
+            if (!source) {
+                showNotice("No PDF source provided. Pass `pdf_url` or `pdf_base64` in context.");
+                return;
+            }
+
+            try {
+                await loadViewerScript();
+                viewerEl.setAttribute("src", source);
+                viewerEl.src = source;
+                callMethod(viewerEl, ["load", "loadPdf", "open", "openPdf", "setDocument"], source);
+                activateTool("text");
+            } catch (error) {
+                mountFallback();
+            }
+        }
+
+        boot();
+    })();
+</script>
+</body>
+</html>

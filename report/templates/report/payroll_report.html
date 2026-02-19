@@ -396,6 +396,13 @@
         <ion-icon name="document-text-outline" class="mr-1"></ion-icon>
         {% trans "Download Tax Forms (PDF)" %}
     </button>
+    <div id="preview-tax-forms-controls" class="d-inline-flex align-items-center ml-2 mb-2" style="display:none;">
+        <span class="mr-2">🔍 {% trans "Preview & Edit" %}:</span>
+        <button type="button" class="oh-btn oh-btn--secondary oh-btn--small preview-tax-form-btn mr-1" data-form-type="941">Form 941</button>
+        <button type="button" class="oh-btn oh-btn--secondary oh-btn--small preview-tax-form-btn mr-1" data-form-type="940">Form 940</button>
+        <button type="button" class="oh-btn oh-btn--secondary oh-btn--small preview-tax-form-btn mr-1" data-form-type="de9">Form DE9</button>
+        <button type="button" class="oh-btn oh-btn--secondary oh-btn--small preview-tax-form-btn" data-form-type="de9c">Form DE9C</button>
+    </div>
 
     <!-- Pivot Container -->
     <div id="pivot-container" class="mb-5" style="width: 100%; overflow-x: auto;">
@@ -416,6 +423,7 @@
             // Hide all containers first
             $(".pivot-wrapper").hide();
             $("#download-tax-forms-btn").hide();
+            $("#preview-tax-forms-controls").hide();
 
             // Determine current container and row config
             let containerId = "";
@@ -432,6 +440,7 @@
                 containerId = "pivot-liability";
                 rowsConfig = ["Employee", "Tax Component", "Employer Liability", "Employee Withheld", "Rate"];
                 $("#download-tax-forms-btn").show();
+                $("#preview-tax-forms-controls").css("display", "inline-flex");
             } else if (model === "cash_requirement") {
                 containerId = "pivot-cash";
                 rowsConfig = ["Category", "Payee", "Amount"];
@@ -808,6 +817,13 @@
             const formData = $("#filterForm").serialize();
             // window.location.href handles the download
             window.location.href = `download-tax-forms?${formData}`;
+        });
+        $(".preview-tax-form-btn").on("click", function (e) {
+            e.preventDefault();
+            const formType = $(this).data("form-type");
+            const params = new URLSearchParams($("#filterForm").serialize());
+            params.set("form_type", formType);
+            window.open(`/report/preview-tax-form?${params.toString()}`, "_blank");
         });
         $("#save-tax-settings-btn").on("click", function (e) {
             e.preventDefault();

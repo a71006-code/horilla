@@ -70,6 +70,11 @@ if apps.is_installed("payroll"):
                 name="download-tax-forms"
             ),
             path(
+                "preview-tax-form",
+                payroll_report.preview_tax_form,
+                name="preview-tax-form",
+            ),
+            path(
                 "update-tax-settings",
                 payroll_report.update_tax_settings,
                 name="update-tax-settings",
