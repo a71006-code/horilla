@@ -177,20 +177,23 @@ class TaxFormFiller:
             "quarter": "Quarter",
             "year": "Year",
             
-            # Column Mapping
+            # Column Mapping (Items C-K)
             "total_wages": "Total Subject Wages", 
-            "pit_wages": "PIT Wages",
-            "pit_withheld": "PIT Withheld",
             "ui_wages": "UI Subject Wages",
             "ui_tax": "UI Tax",
             "ett_tax": "ETT Tax",
+            "sdi_wages": "SDI Subject Wages",
             "sdi_tax": "SDI Withheld",
+            "pit_wages": "PIT Wages",
+            "pit_withheld": "PIT Withheld",
+            "total_taxes_due": "Total Taxes Due",
         },
         "DE9C": {
              # CA DE 9C (Continuation)
              "employer_name": "Business Name",
              "employer_account_number": "Employer Account No",
              "quarter_ended": "Quarter Ended", 
+             "year": "Year",
         }
     }
 

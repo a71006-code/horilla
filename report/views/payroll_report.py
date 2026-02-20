@@ -672,6 +672,8 @@ if apps.is_installed("payroll"):
             addr_parts = [comp.address, comp.city, comp.state, comp.zip, comp.country]
             company_address = ", ".join([p for p in addr_parts if p])
             employer_ein = getattr(comp, "company_registration_number", "00-0000000")
+        
+        state_employer_id = request.GET.get("state_employer_id", employer_ein)
         tax_settings = _get_payroll_settings(request, create=False)
 
         result = calculate_tax_liability(
@@ -860,7 +862,7 @@ if apps.is_installed("payroll"):
             "employer_name_page2": company_name,
             "employer_ein_page2_part1": ein_part1,
             "employer_ein_page2_part2": ein_part2,
-            "employer_account_number": employer_ein, 
+            "employer_account_number": state_employer_id, 
             "employee_count": employee_count,
 
             **q_map,
@@ -956,6 +958,12 @@ if apps.is_installed("payroll"):
             "ett_tax": round(aggregates["DE9"]["ett_tax"], 2),
             "sdi_wages": round(aggregates["DE9"]["sdi_wages"], 2),
             "sdi_tax": round(aggregates["DE9"]["sdi_tax"], 2),
+            "total_taxes_due": round(
+                aggregates["DE9"]["unemployment_insurance_tax"] + 
+                aggregates["DE9"]["ett_tax"] + 
+                aggregates["DE9"]["sdi_tax"] + 
+                aggregates["DE9"]["pit_withheld"], 2
+            ),
             "total_wages": round(total_gross, 2),
             "quarter": f"{quarter_idx + 1}",
             "year": f"{reference_date.year}",
