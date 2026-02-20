@@ -14,6 +14,18 @@ if apps.is_installed("payroll"):
 
     TAX_FORM_TYPES = ("941", "940", "DE9", "DE9C")
 
+    def split_dollars_cents(amount):
+        """Splits a float amount into (dollars, cents) strings."""
+        if amount is None:
+            return "", ""
+        try:
+            val = float(amount)
+            dollars = int(val)
+            cents = int(round((val - dollars) * 100))
+            return str(dollars), f"{cents:02d}"
+        except (ValueError, TypeError):
+            return "", ""
+
     def _get_selected_company(request):
         selected_company = request.session.get("selected_company")
         if not selected_company or selected_company == "all":
