@@ -168,13 +168,13 @@ def calculate_tax_liability(payslips, company=None):
                 # FUTA
                 elif any(x in title_lower for x in ["futa", "federal unemployment", "fed unemp", "unemployment tax"]): reporting_type = "FUTA"
                 # CA SDI
-                elif any(x in title_lower for x in ["ca sdi", "casdi", "disability", "state disability", "sdi"]): reporting_type = "CA_SDI"
+                elif any(x in title_lower for x in ["ca sdi", "casdi", "disability", "state disability", "sdi", "s.d.i."]): reporting_type = "CA_SDI"
                 # CA ETT
-                elif any(x in title_lower for x in ["ca ett", "caett", "training tax", "employment training", "ett"]): reporting_type = "CA_ETT"
+                elif any(x in title_lower for x in ["ca ett", "caett", "training tax", "employment training", "ett", "e.t.t."]): reporting_type = "CA_ETT"
                 # CA UI
-                elif any(x in title_lower for x in ["ca ui", "caui", "ca unemployment", "state unemployment", "sui"]): reporting_type = "CA_UI"
+                elif any(x in title_lower for x in ["ca ui", "caui", "ca unemployment", "state unemployment", "sui", "u.i."]): reporting_type = "CA_UI"
                 # CA PIT / State Income Tax
-                elif any(x in title_lower for x in ["ca tax", "california", "ca pit", "state income", "sit", "personal income", "pit"]): reporting_type = "CA_PIT"
+                elif any(x in title_lower for x in ["ca tax", "california", "ca pit", "state income", "sit", "personal income", "pit", "ca withholding", "state withholding", "ca sit", "ca p.i.t."]): reporting_type = "CA_PIT"
                 # Federal Income Tax
                 elif any(x in title_lower for x in ["federal tax", "fed tax", "fit", "federal withholding", "income tax", "withholding"]): reporting_type = "FIT"
 

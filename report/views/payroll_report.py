@@ -959,18 +959,28 @@ if apps.is_installed("payroll"):
             "sdi_wages": round(aggregates["DE9"]["sdi_wages"], 2),
             "sdi_tax": round(aggregates["DE9"]["sdi_tax"], 2),
             "total_taxes_due": round(
-                aggregates["DE9"]["unemployment_insurance_tax"] + 
-                aggregates["DE9"]["ett_tax"] + 
-                aggregates["DE9"]["sdi_tax"] + 
-                aggregates["DE9"]["pit_withheld"], 2
+                (aggregates["DE9"]["unemployment_insurance_tax"] or 0) + 
+                (aggregates["DE9"]["ett_tax"] or 0) + 
+                (aggregates["DE9"]["sdi_tax"] or 0) + 
+                (aggregates["DE9"]["pit_withheld"] or 0), 2
             ),
+        }
+
+        # Handle split dollars/cents for DE9
+        for key in ["pit_wages", "pit_withheld", "ui_wages", "ui_tax", "ett_wages", "ett_tax", "sdi_wages", "sdi_tax", "total_taxes_due"]:
+            val = data.get(key, 0.0)
+            d, c = split_dollars_cents(val)
+            data[f"{key}_dollars"] = d
+            data[f"{key}_cents"] = c
+
+        data.update({
             "total_wages": round(total_gross, 2),
             "quarter": f"{quarter_idx + 1}",
             "year": f"{reference_date.year}",
             "quarter_ended": f"{(quarter_idx + 1) * 3}/{(reference_date.month % 3 or 3)}/{reference_date.year}",
 
             "employees": []
-        }
+        })
 
         emp_data = {}
         for payslip in payslips:

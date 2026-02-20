@@ -167,9 +167,9 @@ class TaxFormFiller:
             "futa_liability_total_cents": "topmostSubform[0].Page1[0].f1_39[0]",
         },
         "DE9": {
-            # CA DE 9 (AcroForm - Simple Names)
+            # CA DE 9 (AcroForm - Simple Names + standard indices)
             "employer_name": "Business Name",
-            "employer_account_number": "Employer Account No", # Note: "No" vs "Number"
+            "employer_account_number": "Employer Account No",
             "employer_address": "Address",
             "employer_city": "City",
             "employer_state": "State", 
@@ -178,15 +178,53 @@ class TaxFormFiller:
             "year": "Year",
             
             # Column Mapping (Items C-K)
+            # Item C: Total Subject Wages
             "total_wages": "Total Subject Wages", 
+            # Item D: UI Subject Wages
             "ui_wages": "UI Subject Wages",
+            # Item E: UI Tax
             "ui_tax": "UI Tax",
+            # Item F: ETT Tax
             "ett_tax": "ETT Tax",
+            # Item G: SDI Subject Wages
             "sdi_wages": "SDI Subject Wages",
+            # Item H: SDI Withheld
             "sdi_tax": "SDI Withheld",
+            # Item I: PIT Wages
             "pit_wages": "PIT Wages",
+            # Item J: PIT Withheld
             "pit_withheld": "PIT Withheld",
+            # Item K: Total Taxes Due
             "total_taxes_due": "Total Taxes Due",
+
+            # Split Field support for DE 9 (Common in some versions)
+            "ui_wages_dollars": "UI Subject Wages_Dollars",
+            "ui_wages_cents": "UI Subject Wages_Cents",
+            "ui_tax_dollars": "UI Tax_Dollars",
+            "ui_tax_cents": "UI Tax_Cents",
+            "ett_tax_dollars": "ETT Tax_Dollars",
+            "ett_tax_cents": "ETT Tax_Cents",
+            "sdi_wages_dollars": "SDI Subject Wages_Dollars",
+            "sdi_wages_cents": "SDI Subject Wages_Cents",
+            "sdi_tax_dollars": "SDI Withheld_Dollars",
+            "sdi_tax_cents": "SDI Withheld_Cents",
+            "pit_wages_dollars": "PIT Wages_Dollars",
+            "pit_wages_cents": "PIT Wages_Cents",
+            "pit_withheld_dollars": "PIT Withheld_Dollars",
+            "pit_withheld_cents": "PIT Withheld_Cents",
+            "total_taxes_due_dollars": "Total Taxes Due_Dollars",
+            "total_taxes_due_cents": "Total Taxes Due_Cents",
+
+            # Fallback mappings for some DE 9 versions (using f1_xx indices)
+            "total_wages": "f1_09",
+            "ui_wages": "f1_10",
+            "ui_tax": "f1_11",
+            "ett_tax": "f1_12",
+            "sdi_wages": "f1_13",
+            "sdi_tax": "f1_14",
+            "pit_wages": "f1_15",
+            "pit_withheld": "f1_16",
+            "total_taxes_due": "f1_17",
         },
         "DE9C": {
              # CA DE 9C (Continuation)
