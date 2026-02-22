@@ -181,21 +181,21 @@ class TaxFormFiller:
             # Item C: Total Subject Wages
             "total_wages": "Total Subject Wages", 
             # Item D: UI Subject Wages
-            "ui_wages": "UI Subject Wages",
+            "ui_wages": "D2",
             # Item E: UI Tax
-            "ui_tax": "UI Tax",
+            "ui_tax": "D3",
             # Item F: ETT Tax
-            "ett_tax": "ETT Tax",
+            "ett_tax": "E2",
             # Item G: SDI Subject Wages
-            "sdi_wages": "SDI Subject Wages",
+            "sdi_wages": "F2",
             # Item H: SDI Withheld
-            "sdi_tax": "SDI Withheld",
+            "sdi_tax": "F3",
             # Item I: PIT Wages
-            "pit_wages": "PIT Wages",
+            "pit_wages": "PIT Wages", # Note: Field 'PIT Wages' not found in some versions, check layout
             # Item J: PIT Withheld
             "pit_withheld": "PIT Withheld",
             # Item K: Total Taxes Due
-            "total_taxes_due": "Total Taxes Due",
+            "total_taxes_due": "Total",
 
             # Split Field support for DE 9 (Common in some versions)
             "ui_wages_dollars": "UI Subject Wages_Dollars",
