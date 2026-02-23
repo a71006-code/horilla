@@ -183,8 +183,8 @@ class TaxFormFiller:
             "total_wages": "Total Subject Wages", 
             
             # Item D: UI
-            "ui_wages": "D2",
-            "ui_tax": "D3",
+            "unemployment_insurance_wages": "D2",
+            "unemployment_insurance_tax": "D3",
             
             # Item E: ETT
             "ett_tax": "E2",
