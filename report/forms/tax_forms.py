@@ -167,64 +167,40 @@ class TaxFormFiller:
             "futa_liability_total_cents": "topmostSubform[0].Page1[0].f1_39[0]",
         },
         "DE9": {
-            # CA DE 9 (AcroForm - Simple Names + standard indices)
-            "employer_name": "Business Name",
-            "employer_account_number": "Employer Account No",
-            "employer_address": "Address",
-            "employer_city": "City",
-            "employer_state": "State", 
-            "employer_zip": "ZIP Code",
-            "quarter": "Quarter",
-            "year": "Year",
+            # CA DE 9 (Updated for new template)
+            # Template fields: Employer Account No, Year, Quarter, FEIN, Total Subject Wages, 
+            # D2(UI Wages), D3(UI Tax), E2(ETT Tax), F2(SDI Wages), F3(SDI Tax), 
+            # PIT Withheld, Subtotal, Less, Total, Text1, Text3
             
-            # Column Mapping (Items C-K)
+            "employer_account_number": "Employer Account No",
+            "year": "Year",
+            "quarter": "Quarter",
+            "employer_ein": "FEIN",
+            "employer_name": "Text1", # Trial mapping
+            "employer_address": "Text3", # Trial mapping
+
             # Item C: Total Subject Wages
             "total_wages": "Total Subject Wages", 
-            # Item D: UI Subject Wages
+            
+            # Item D: UI
             "ui_wages": "D2",
-            # Item E: UI Tax
             "ui_tax": "D3",
-            # Item F: ETT Tax
+            
+            # Item E: ETT
             "ett_tax": "E2",
-            # Item G: SDI Subject Wages
+            
+            # Item F: SDI
             "sdi_wages": "F2",
-            # Item H: SDI Withheld
             "sdi_tax": "F3",
-            # Item I: PIT Wages
-            "pit_wages": "PIT Wages", # Note: Field 'PIT Wages' not found in some versions, check layout
+            
             # Item J: PIT Withheld
             "pit_withheld": "PIT Withheld",
+            
             # Item K: Total Taxes Due
             "total_taxes_due": "Total",
 
-            # Split Field support for DE 9 (Common in some versions)
-            "ui_wages_dollars": "UI Subject Wages_Dollars",
-            "ui_wages_cents": "UI Subject Wages_Cents",
-            "ui_tax_dollars": "UI Tax_Dollars",
-            "ui_tax_cents": "UI Tax_Cents",
-            "ett_tax_dollars": "ETT Tax_Dollars",
-            "ett_tax_cents": "ETT Tax_Cents",
-            "sdi_wages_dollars": "SDI Subject Wages_Dollars",
-            "sdi_wages_cents": "SDI Subject Wages_Cents",
-            "sdi_tax_dollars": "SDI Withheld_Dollars",
-            "sdi_tax_cents": "SDI Withheld_Cents",
-            "pit_wages_dollars": "PIT Wages_Dollars",
-            "pit_wages_cents": "PIT Wages_Cents",
-            "pit_withheld_dollars": "PIT Withheld_Dollars",
-            "pit_withheld_cents": "PIT Withheld_Cents",
-            "total_taxes_due_dollars": "Total Taxes Due_Dollars",
-            "total_taxes_due_cents": "Total Taxes Due_Cents",
-
-            # Fallback mappings for some DE 9 versions (using f1_xx indices)
-            "total_wages": "f1_09",
-            "ui_wages": "f1_10",
-            "ui_tax": "f1_11",
-            "ett_tax": "f1_12",
-            "sdi_wages": "f1_13",
-            "sdi_tax": "f1_14",
-            "pit_wages": "f1_15",
-            "pit_withheld": "f1_16",
-            "total_taxes_due": "f1_17",
+            # Fallback for older code passing split fields (though not used in this PDF)
+            "ui_wages_dollars": "D2_dollars_dummy",
         },
         "DE9C": {
              # CA DE 9C (Continuation)

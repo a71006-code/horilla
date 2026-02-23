@@ -862,6 +862,7 @@ if apps.is_installed("payroll"):
         data = {
             "employer_name": company_name,
             "employer_trade_name": getattr(comp, "company_trade_name", ""),
+            "employer_address": company_address, # Combined address for DE9 Text3 mapping
             "employer_address_number": addr_number,
             "employer_address_street": addr_street,
             "employer_address_suite": addr_suite,
