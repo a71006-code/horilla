@@ -964,6 +964,7 @@ if apps.is_installed("payroll"):
             "futa_liability_total_cents": futa_l_c,
 
             "pit_wages": round(aggregates["DE9"]["pit_wages"], 2),
+            "total_pit_wages": round(aggregates["DE9"]["pit_wages"], 2),
             "pit_withheld": round(aggregates["DE9"]["pit_withheld"], 2),
             "ui_wages": round(aggregates["DE9"]["unemployment_insurance_wages"], 2),
             "ui_tax": round(aggregates["DE9"]["unemployment_insurance_tax"], 2),
@@ -995,36 +996,24 @@ if apps.is_installed("payroll"):
             "employees": []
         })
 
-        emp_data = {}
-        for payslip in payslips:
-            eid = payslip.employee_id.id
-            if eid not in emp_data:
-                emp_data[eid] = {
-                    "first_name": payslip.employee_id.employee_first_name,
-                    "last_name": payslip.employee_id.employee_last_name,
-                    "ssn": getattr(payslip.employee_id, "ssn", ""), 
-                    "total_wages": 0.0,
-                    "pit_wages": 0.0,
-                    "pit_withheld": 0.0
-                }
+        employee_aggregates = result.get("employee_aggregates", [])
+        ssn_by_employee_id = {}
+        for payslip in payslips.select_related("employee_id"):
+            employee = payslip.employee_id
+            if employee and employee.id not in ssn_by_employee_id:
+                ssn_by_employee_id[employee.id] = getattr(employee, "ssn", "")
 
-            gross = float(payslip.gross_pay or 0)
-            emp_data[eid]["total_wages"] += gross
-
-            ph_data = payslip.pay_head_data or {}
-            deductions = ph_data.get("pretax_deductions", []) + ph_data.get("post_tax_deductions", []) + ph_data.get("tax_deductions", [])
-
-            pit_amt = 0.0
-            for d in deductions:
-                title_lower = d.get("title", "").lower()
-                if any(x in title_lower for x in ["ca tax", "california", "ca pit", "state income", "sit", "personal income", "pit"]):
-                    pit_amt += float(d.get("amount", 0))
-
-            emp_data[eid]["pit_withheld"] += pit_amt
-            if pit_amt > 0:
-                emp_data[eid]["pit_wages"] += gross
-
-        data["employees"] = list(emp_data.values())
+        data["employees"] = [
+            {
+                "first_name": row.get("first_name", ""),
+                "last_name": row.get("last_name", ""),
+                "ssn": ssn_by_employee_id.get(row.get("employee_id"), ""),
+                "total_wages": round(float(row.get("total_wages", 0.0) or 0.0), 2),
+                "pit_wages": round(float(row.get("pit_wages", 0.0) or 0.0), 2),
+                "pit_withheld": round(float(row.get("pit_withheld", 0.0) or 0.0), 2),
+            }
+            for row in employee_aggregates
+        ]
         return data
 
     def _fill_tax_forms(form_data, form_types):

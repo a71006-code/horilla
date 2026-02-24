@@ -183,8 +183,8 @@ class TaxFormFiller:
             "total_wages": "Total Subject Wages", 
             
             # Item D: UI
-            "unemployment_insurance_wages": "D2",
-            "unemployment_insurance_tax": "D3",
+            "ui_wages": "D2",
+            "ui_tax": "D3",
             
             # Item E: ETT
             "ett_tax": "E2",
@@ -192,6 +192,10 @@ class TaxFormFiller:
             # Item F: SDI
             "sdi_wages": "F2",
             "sdi_tax": "F3",
+
+            # Item G/H variants on some DE9 templates.
+            "pit_wages": "PIT Wages",
+            "total_pit_wages": "Total PIT Wages",
             
             # Item J: PIT Withheld
             "pit_withheld": "PIT Withheld",

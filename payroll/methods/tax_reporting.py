@@ -18,7 +18,8 @@ def calculate_tax_liability(payslips, company=None):
                 "941": { ... },
                 "940": { "futa_liability": float, ... },
                 "DE9": { ... }
-            }
+            },
+            "employee_aggregates": [list of per-employee DE9C rows]
         }
     """
     
@@ -57,7 +58,11 @@ def calculate_tax_liability(payslips, company=None):
         except: return 0.0
 
     if not payslips.exists():
-        return {"detailed_liability": [], "form_aggregates": form_aggregates}
+        return {
+            "detailed_liability": [],
+            "form_aggregates": form_aggregates,
+            "employee_aggregates": [],
+        }
 
     # 2. Pre-fetch Data
     # We need to calculate YTD for Wage Limits. 
@@ -133,17 +138,31 @@ def calculate_tax_liability(payslips, company=None):
         )
     }
 
+    employee_aggregates_map = {}
+
     # 3. Process Each Payslip
     for item in payslip_values:
         pid = item["id"]
+        emp_id = item["employee_id"]
         gross = safefloat(item["gross_pay"])
         ytd_gross_prior = ytd_map.get(pid, 0.0)
+
+        if emp_id not in employee_aggregates_map:
+            employee_aggregates_map[emp_id] = {
+                "employee_id": emp_id,
+                "first_name": item["employee_id__employee_first_name"],
+                "last_name": item["employee_id__employee_last_name"],
+                "total_wages": 0.0,
+                "pit_wages": 0.0,
+                "pit_withheld": 0.0,
+            }
         
         ph_data = item["pay_head_data"] or {}
         deductions = ph_data.get("pretax_deductions", []) + ph_data.get("post_tax_deductions", []) + ph_data.get("tax_deductions", [])
         
         # Aggregate Total Wages
         form_aggregates["total_wages"] += gross
+        employee_aggregates_map[emp_id]["total_wages"] += gross
         
         # Federal Income Tax (Direct Field)
         fit = safefloat(ph_data.get("federal_tax", 0))
@@ -212,8 +231,13 @@ def calculate_tax_liability(payslips, company=None):
             # Maybe for FICA_SS we still force it if not set? 
             # Ideally we trust the model. But to be safe during transition:
             if limit is None:
-                 if reporting_type == "FUTA": limit = 7000.0 # Safe fallback
-                 elif reporting_type == "FICA_SS": limit = 168600.0 # Safe fallback
+                 if reporting_type in ["FUTA", "CA_UI", "CA_ETT"]:
+                     limit = 7000.0 # Safe fallback
+                 elif reporting_type == "FICA_SS":
+                     limit = 168600.0 # Safe fallback
+                 elif reporting_type == "CA_SDI":
+                     # 2024/2025 CA SDI wage base fallback.
+                     limit = 153164.0
             
             if employer_rate > 0 or reporting_type in ["FUTA", "CA_UI", "CA_ETT"]:
                 if limit is not None:
@@ -244,8 +268,10 @@ def calculate_tax_liability(payslips, company=None):
             elif reporting_type == "CA_PIT":
                 form_aggregates["DE9"]["pit_wages"] += base_amount
                 form_aggregates["DE9"]["pit_withheld"] += employee_withheld
+                employee_aggregates_map[emp_id]["pit_wages"] += base_amount
+                employee_aggregates_map[emp_id]["pit_withheld"] += employee_withheld
             elif reporting_type == "CA_SDI":
-                form_aggregates["DE9"]["sdi_wages"] += taxable_wages_for_component # SDI has limit too (approx $153k), ignoring for simplified MVP or assuming user configured limit in deduction
+                form_aggregates["DE9"]["sdi_wages"] += taxable_wages_for_component
                 form_aggregates["DE9"]["sdi_tax"] += employee_withheld # Employee pays SDI
             elif reporting_type == "CA_UI":
                 form_aggregates["DE9"]["unemployment_insurance_wages"] += taxable_wages_for_component
@@ -267,7 +293,27 @@ def calculate_tax_liability(payslips, company=None):
                     "Reporting Type": reporting_type # Debug info
                 })
 
+    employee_aggregates = [
+        {
+            "employee_id": emp["employee_id"],
+            "first_name": emp["first_name"],
+            "last_name": emp["last_name"],
+            "total_wages": round(emp["total_wages"], 2),
+            "pit_wages": round(emp["pit_wages"], 2),
+            "pit_withheld": round(emp["pit_withheld"], 2),
+        }
+        for emp in sorted(
+            employee_aggregates_map.values(),
+            key=lambda x: (
+                str(x.get("last_name") or "").lower(),
+                str(x.get("first_name") or "").lower(),
+                x.get("employee_id") or 0,
+            ),
+        )
+    ]
+
     return {
         "detailed_liability": data_list,
-        "form_aggregates": form_aggregates
+        "form_aggregates": form_aggregates,
+        "employee_aggregates": employee_aggregates,
     }
