@@ -167,38 +167,34 @@ class TaxFormFiller:
             "futa_liability_total_cents": "topmostSubform[0].Page1[0].f1_39[0]",
         },
         "DE9": {
-            # CA DE 9 (Updated for new template)
-            # Template fields: Employer Account No, Year, Quarter, FEIN, Total Subject Wages, 
-            # D2(UI Wages), D3(UI Tax), E2(ETT Tax), F2(SDI Wages), F3(SDI Tax), 
-            # PIT Withheld, Subtotal, Less, Total, Text1, Text3
-            
-            "employer_account_number": "Employer Account No",
+            # CA DE 9 (Rev. 1 (1-12))
+            "quarter_ended": "Quarter Ended Date",
+            "due_date": "Due Date",
+            "delinquent_date": "Deliquent Date",
             "year": "Year",
             "quarter": "Quarter",
+            "employer_account_number": "Employer Account No",
             "employer_ein": "FEIN",
-            "employer_name": "Text1", # Trial mapping
-            "employer_address": "Text3", # Trial mapping
+            "employer_name": "Text1",
+            "employer_address": "Text3",
 
             # Item C: Total Subject Wages
             "total_wages": "Total Subject Wages", 
             
             # Item D: UI
+            "ui_rate": "D1",
             "ui_wages": "D2",
-            "ui_wages_cents": "D2_cents_dummy", # Placeholder to avoid conflict if logic tries to split
             "ui_tax": "D3",
             
             # Item E: ETT
-            "ett_wages": "D2", # ETT often uses UI wages as base
+            "ett_rate": "E1",
             "ett_tax": "E2",
             
             # Item F: SDI
+            "sdi_rate": "F1",
             "sdi_wages": "F2",
             "sdi_tax": "F3",
 
-            # Item G/H variants on some DE9 templates.
-            "pit_wages": "PIT Wages",
-            "total_pit_wages": "Total PIT Wages",
-            
             # Item G: California PIT Withheld
             "pit_withheld": "PIT Withheld",
             
@@ -211,8 +207,10 @@ class TaxFormFiller:
             # Item J: Total Taxes Due
             "total_taxes_due": "Total",
 
-            # Fallback for older code passing split fields (though not used in this PDF)
-            "ui_wages_dollars": "D2_dollars_dummy",
+            # Signature Fields
+            "signer_title": "Title",
+            "signer_daytime_phone": "Phone Number",
+            "date_signed": "Date5",
         },
         "DE9C": {
              # CA DE 9C (Continuation)
