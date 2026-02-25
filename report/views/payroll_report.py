@@ -750,10 +750,12 @@ if apps.is_installed("payroll"):
         else:
             q_map["quarter_4"] = q_val
 
-        w_d, w_c = split_amt(total_gross)
+        # Line 2: Wages (Uses f1_13/f1_14 - split into dollars and cents)
+        total_wages_val = float(total_gross or 0)
+        w_d, w_c = split_amt(total_wages_val)
+        
         ui_w_val = float(aggregates["DE9"]["unemployment_insurance_wages"] or 0)
-        # Item D2 expects whole dollars only to avoid layout displacement in the PDF box
-        # We also pad with spaces to align right if necessary, or just provide the integer string.
+        # Item D2 (UI Taxable Wages) expects whole dollars only in the DE 9 template
         ui_w_d = f"{int(round(ui_w_val))}"
         ui_w_c = ""
 
@@ -896,7 +898,7 @@ if apps.is_installed("payroll"):
 
             "total_wages_dollars": w_d,
             "total_wages_cents": w_c,
-            "total_wages": f"{total_w_d}.{total_w_c}", # Combined with decimal for single box Item C
+            "total_wages": f"{w_d}.{w_c}", # Combined with decimal for single box Item C (DE9)
 
             "federal_income_tax_dollars": fit_d,
             "federal_income_tax_cents": fit_c,
