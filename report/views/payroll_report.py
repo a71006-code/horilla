@@ -972,6 +972,13 @@ if apps.is_installed("payroll"):
             "ett_tax": round(aggregates["DE9"]["ett_tax"], 2),
             "sdi_wages": round(aggregates["DE9"]["sdi_wages"], 2),
             "sdi_tax": round(aggregates["DE9"]["sdi_tax"], 2),
+            "subtotal": round(
+                (aggregates["DE9"]["unemployment_insurance_tax"] or 0) + 
+                (aggregates["DE9"]["ett_tax"] or 0) + 
+                (aggregates["DE9"]["sdi_tax"] or 0) + 
+                (aggregates["DE9"]["pit_withheld"] or 0), 2
+            ),
+            "less": 0.0,
             "total_taxes_due": round(
                 (aggregates["DE9"]["unemployment_insurance_tax"] or 0) + 
                 (aggregates["DE9"]["ett_tax"] or 0) + 
@@ -981,7 +988,7 @@ if apps.is_installed("payroll"):
         }
 
         # Handle split dollars/cents for DE9
-        for key in ["pit_wages", "pit_withheld", "ui_wages", "ui_tax", "ett_wages", "ett_tax", "sdi_wages", "sdi_tax", "total_taxes_due"]:
+        for key in ["pit_wages", "pit_withheld", "ui_wages", "ui_tax", "ett_wages", "ett_tax", "sdi_wages", "sdi_tax", "subtotal", "less", "total_taxes_due"]:
             val = data.get(key, 0.0)
             d, c = split_dollars_cents(val)
             data[f"{key}_dollars"] = d

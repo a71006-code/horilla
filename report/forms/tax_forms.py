@@ -197,10 +197,16 @@ class TaxFormFiller:
             "pit_wages": "PIT Wages",
             "total_pit_wages": "Total PIT Wages",
             
-            # Item J: PIT Withheld
+            # Item G: California PIT Withheld
             "pit_withheld": "PIT Withheld",
             
-            # Item K: Total Taxes Due
+            # Item H: Subtotal
+            "subtotal": "Subtotal",
+
+            # Item I: Less
+            "less": "Less",
+
+            # Item J: Total Taxes Due
             "total_taxes_due": "Total",
 
             # Fallback for older code passing split fields (though not used in this PDF)
