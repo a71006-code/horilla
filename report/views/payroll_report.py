@@ -752,7 +752,9 @@ if apps.is_installed("payroll"):
 
         w_d, w_c = split_amt(total_gross)
         ui_w_val = float(aggregates["DE9"]["unemployment_insurance_wages"] or 0)
-        ui_w_d, ui_w_c = split_amt(ui_w_val)
+        # Item D2 expects whole dollars only to avoid layout displacement in the PDF box
+        ui_w_d = f"{int(round(ui_w_val))}"
+        ui_w_c = ""
         
         fit_val = float(aggregates["941"]["federal_income_tax"] or 0)
         ssw_val = float(aggregates["941"]["social_security_wages"] or 0)
@@ -1002,7 +1004,7 @@ if apps.is_installed("payroll"):
             "ui_rate": result.get("ui_rate", "3.4"), 
             "D1": result.get("ui_rate", "3.4"), 
             "D2": ui_w_d,
-            "D2_cents": ui_w_c,
+            "D2_cents": "",
             "ett_rate": result.get("ett_rate", "0.1"),
             "E1": result.get("ett_rate", "0.1"), 
             "sdi_rate": result.get("sdi_rate", "1.1"),
