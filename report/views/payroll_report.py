@@ -761,6 +761,9 @@ if apps.is_installed("payroll"):
         # Item F2 also expects whole dollars only for visual alignment in this template
         sdi_w_d = f"{int(round(sdi_w_val))}"
         sdi_w_c = ""
+
+        # Item C: Total Subject Wages split
+        total_w_d, total_w_c = split_amt(total_gross)
         
         fit_val = float(aggregates["941"]["federal_income_tax"] or 0)
         ssw_val = float(aggregates["941"]["social_security_wages"] or 0)
@@ -893,6 +896,7 @@ if apps.is_installed("payroll"):
 
             "total_wages_dollars": w_d,
             "total_wages_cents": w_c,
+            "total_wages": f"{total_w_d}.{total_w_c}", # Combined with decimal for single box Item C
 
             "federal_income_tax_dollars": fit_d,
             "federal_income_tax_cents": fit_c,
@@ -1008,7 +1012,6 @@ if apps.is_installed("payroll"):
             data[f"{key}_cents"] = c
 
         data.update({
-            "total_wages": round(total_gross, 2),
             "ui_rate": result.get("ui_rate", "3.4"), 
             "D1": result.get("ui_rate", "3.4"), 
             "D2": ui_w_d,
