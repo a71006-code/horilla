@@ -753,8 +753,14 @@ if apps.is_installed("payroll"):
         w_d, w_c = split_amt(total_gross)
         ui_w_val = float(aggregates["DE9"]["unemployment_insurance_wages"] or 0)
         # Item D2 expects whole dollars only to avoid layout displacement in the PDF box
+        # We also pad with spaces to align right if necessary, or just provide the integer string.
         ui_w_d = f"{int(round(ui_w_val))}"
         ui_w_c = ""
+
+        sdi_w_val = float(aggregates["DE9"]["sdi_wages"] or 0)
+        # Item F2 also expects whole dollars only for visual alignment in this template
+        sdi_w_d = f"{int(round(sdi_w_val))}"
+        sdi_w_c = ""
         
         fit_val = float(aggregates["941"]["federal_income_tax"] or 0)
         ssw_val = float(aggregates["941"]["social_security_wages"] or 0)
@@ -976,6 +982,8 @@ if apps.is_installed("payroll"):
             "ett_wages": round(aggregates["DE9"]["ett_wages"], 2),
             "ett_tax": round(aggregates["DE9"]["ett_tax"], 2),
             "sdi_wages": round(aggregates["DE9"]["sdi_wages"], 2),
+            "F2": sdi_w_d,
+            "F2_cents": "",
             "sdi_tax": round(aggregates["DE9"]["sdi_tax"], 2),
             "subtotal": round(
                 (aggregates["DE9"]["unemployment_insurance_tax"] or 0) + 
