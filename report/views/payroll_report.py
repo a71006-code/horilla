@@ -996,6 +996,9 @@ if apps.is_installed("payroll"):
 
         data.update({
             "total_wages": round(total_gross, 2),
+            "D1": result.get("ui_rate", "3.4"), # Example fallback
+            "E1": result.get("ett_rate", "0.1"), # Example fallback
+            "F1": result.get("sdi_rate", "1.1"), # Example fallback
             "quarter": f"{quarter_idx + 1}",
             "year": f"{reference_date.year}",
             "quarter_ended": f"{(quarter_idx + 1) * 3}/{(reference_date.month % 3 or 3)}/{reference_date.year}",

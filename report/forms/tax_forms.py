@@ -187,6 +187,7 @@ class TaxFormFiller:
             "ui_tax": "D3",
             
             # Item E: ETT
+            "ett_wages": "D2", # ETT often uses UI wages as base
             "ett_tax": "E2",
             
             # Item F: SDI
