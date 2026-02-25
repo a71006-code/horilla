@@ -184,6 +184,7 @@ class TaxFormFiller:
             
             # Item D: UI
             "ui_wages": "D2",
+            "ui_wages_cents": "D2_cents_dummy", # Placeholder to avoid conflict if logic tries to split
             "ui_tax": "D3",
             
             # Item E: ETT
