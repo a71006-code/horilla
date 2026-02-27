@@ -294,6 +294,23 @@ class TaxFormFiller:
             doc = fitz.open(form_path)
             mapping = self.FORM_MAPPINGS.get(form_type, {})
             
+            # Helper for DE9 amount formatting
+            def format_de9_amount(val, width=15):
+                """
+                Formats a float/dec for DE9 single-box amount fields.
+                Removes the decimal point and right-aligns.
+                Example: 255.59 -> "          25559"
+                """
+                try:
+                    # Scale by 100 and convert to int to drop decimal
+                    # e.g. 255.59 -> 25559
+                    # e.g. 7517.0 -> 751700
+                    cents = int(round(float(val) * 100))
+                    s = str(cents)
+                    return s.rjust(width)
+                except:
+                    return "".rjust(width)
+
             filled_fields = 0
             
             for page in doc:
@@ -313,6 +330,18 @@ class TaxFormFiller:
                         for internal_key, pdf_key in mapping.items():
                             if pdf_key == field_name and internal_key in data:
                                 val_to_set = data[internal_key]
+                                
+                                # Special Handling for DE9 Amount Boxes (Rev 1-12)
+                                if form_type == "DE9":
+                                    # Amount fields that need decimal removal and rjust
+                                    if internal_key in ["total_wages", "ui_tax", "ett_tax", "sdi_tax", "pit_withheld", "subtotal", "less", "total_taxes_due"]:
+                                        val_to_set = format_de9_amount(val_to_set)
+                                    # Taxable Wages (D2, F2) - Whole Dollars Only, rjust
+                                    elif internal_key in ["ui_wages", "sdi_wages"]:
+                                        try:
+                                            val_to_set = str(int(float(val_to_set))).rjust(12)
+                                        except:
+                                            val_to_set = "".rjust(12)
                                 break
                     
                     # Strategy 3: Simple Name Fallback

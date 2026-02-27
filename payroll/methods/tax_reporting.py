@@ -239,7 +239,7 @@ def calculate_tax_liability(payslips, company=None):
                      # 2024/2025 CA SDI wage base fallback.
                      limit = 153164.0
             
-            if employer_rate > 0 or reporting_type in ["FUTA", "CA_UI", "CA_ETT"]:
+            if employer_rate > 0 or employee_withheld > 0 or reporting_type in ["FUTA", "CA_UI", "CA_ETT", "CA_SDI"]:
                 if limit is not None:
                      # Taxable part is the portion of CURRENT wages that falls below the cumulative limit
                      # max(0, min(amount, limit - prior_ytd))
