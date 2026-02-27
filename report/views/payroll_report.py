@@ -755,14 +755,13 @@ if apps.is_installed("payroll"):
         total_wages_str = f"{total_w_d}.{total_w_c}"
         
         ui_w_val = float(aggregates["DE9"]["unemployment_insurance_wages"] or 0)
-        # Item D2 (UI Taxable Wages) expects whole dollars only in the DE 9 template
-        # Adding leading spaces to help push the number into the dollar box area if it's shifting to the decimal box
-        ui_w_d = f"{int(round(ui_w_val)):>15}"
+        # Item D2 (UI Taxable Wages) expects whole dollars only
+        ui_w_d = str(int(round(ui_w_val)))
         ui_w_c = ""
 
         sdi_w_val = float(aggregates["DE9"]["sdi_wages"] or 0)
-        # Item F2 also expects whole dollars only for visual alignment in this template
-        sdi_w_d = f"{int(round(sdi_w_val))}"
+        # Item F2 also expects whole dollars only
+        sdi_w_d = str(int(round(sdi_w_val)))
         sdi_w_c = ""
         
         fit_val = float(aggregates["941"]["federal_income_tax"] or 0)
