@@ -307,9 +307,9 @@ class TaxFormFiller:
                     # e.g. 7517.0 -> 751700
                     cents = int(round(float(val) * 100))
                     s = str(cents)
-                    return s.rjust(width)
+                    return f" {s}"
                 except:
-                    return "".rjust(width)
+                    return ""
 
             filled_fields = 0
             
@@ -339,9 +339,9 @@ class TaxFormFiller:
                                     # Taxable Wages (D2, F2) - Whole Dollars Only, rjust
                                     elif internal_key in ["ui_wages", "sdi_wages"]:
                                         try:
-                                            val_to_set = str(int(float(val_to_set))).rjust(12)
+                                            val_to_set = f" {str(int(float(val_to_set)))}"
                                         except:
-                                            val_to_set = "".rjust(12)
+                                            val_to_set = ""
                                 break
                     
                     # Strategy 3: Simple Name Fallback
