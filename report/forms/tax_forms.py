@@ -331,12 +331,12 @@ class TaxFormFiller:
                                     # Amount fields that need decimal removal and rjust
                                     if internal_key in ["total_wages", "ui_tax", "ett_tax", "sdi_tax", "pit_withheld", "subtotal", "less", "total_taxes_due"]:
                                         val_to_set = format_de9_amount(val_to_set)
-                                    # Taxable Wages (D2, F2) - Whole Dollars Only, minimal padding
+                                    # Taxable Wages (D2, F2) - Whole Dollars, adding .00 as requested
                                     elif internal_key in ["ui_wages", "sdi_wages"]:
                                         try:
                                             # Clean the string of existing padding first
                                             raw_val = str(val_to_set).strip()
-                                            val_to_set = f" {str(int(float(raw_val)))}"
+                                            val_to_set = f" {str(int(float(raw_val)))}.00"
                                         except:
                                             val_to_set = ""
                                 break
