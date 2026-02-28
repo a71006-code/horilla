@@ -295,19 +295,14 @@ class TaxFormFiller:
             mapping = self.FORM_MAPPINGS.get(form_type, {})
             
             # Helper for DE9 amount formatting
-            def format_de9_amount(val, width=15):
+            def format_de9_amount(val):
                 """
                 Formats a float/dec for DE9 single-box amount fields.
-                Removes the decimal point and right-aligns.
-                Example: 255.59 -> "          25559"
+                Uses literal decimal and minimal nudge.
+                Example: 255.59 -> " 255.59"
                 """
                 try:
-                    # Scale by 100 and convert to int to drop decimal
-                    # e.g. 255.59 -> 25559
-                    # e.g. 7517.0 -> 751700
-                    cents = int(round(float(val) * 100))
-                    s = str(cents)
-                    return f" {s}"
+                    return f" {float(val):.2f}"
                 except:
                     return ""
 
