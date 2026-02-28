@@ -230,61 +230,37 @@ class TaxFormFiller:
             candidates.append(forms_dir)
             
         # 1. Check mapped path from settings (Standard Django structure)
-        # settings.BASE_DIR usually points to project root. 
-        # Inside Docker, if app is at /app/horilla, BASE_DIR might be /app/horilla or /app depending on structure.
-        # We assume standard structure: BASE_DIR/report/static/report/forms
         path_via_settings = os.path.join(settings.BASE_DIR, "report", "static", "report", "forms")
         candidates.append(path_via_settings)
 
-        # 2. Check explicit Docker internal path (based on docker-compose volume mapping)
-        # docker-compose.yaml maps to: /app/report/static/report/forms
+        # 2. Check explicit Docker internal path
         candidates.append("/app/report/static/report/forms")
         
-        # 3. Check for specific common dev paths just in case
+        # 3. Check for specific common dev paths
         candidates.append("/app/staticfiles/report/forms")
 
         logger.info(f"[TaxFormFiller] Initializing. Checking paths: {candidates}")
         
         for path in candidates:
             if os.path.exists(path):
-                # Verify it contains at least one of the expected files
                 if os.path.exists(os.path.join(path, "f941.pdf")):
                     self.forms_dir = path
                     logger.info(f"[TaxFormFiller] Found valid templates at: {path}")
-                    try:
-                        files = os.listdir(path)
-                        logger.info(f"[TaxFormFiller] Directory contents: {files}")
-                    except Exception as e:
-                        logger.error(f"[TaxFormFiller] Error listing directory {path}: {e}")
                     break
-                else:
-                    logger.warning(f"[TaxFormFiller] Directory exists but f941.pdf not found: {path}")
-            else:
-                logger.debug(f"[TaxFormFiller] Path not found: {path}")
 
         if not self.forms_dir:
             logger.error("[TaxFormFiller] No valid template directory found in candidates.")
-            # Fallback to the settings path even if check failed, to produce a clear error message later
             self.forms_dir = path_via_settings 
 
     def fill_form(self, form_type, data):
         """
         Fills a PDF form of the specified type with the provided data.
-        
-        Args:
-            form_type (str): "941", "940", "DE9", or "DE9C"
-            data (dict): Dictionary containing data to populate the form.
-            
-        Returns:
-            bytes: The filled PDF content as bytes.
         """
         if not self.forms_dir:
              raise FileNotFoundError("[TaxFormFiller] Template directory not configured.")
 
-        filename = f"f{form_type.lower()}.pdf" # e.g., f941.pdf
+        filename = f"f{form_type.lower()}.pdf" 
         form_path = os.path.join(self.forms_dir, filename)
-        
-        logger.info(f"[TaxFormFiller] Attempting to fill {form_type} using template: {form_path}")
         
         if not os.path.exists(form_path):
             logger.error(f"[TaxFormFiller] Template file missing: {form_path}")
@@ -298,11 +274,10 @@ class TaxFormFiller:
             def format_de9_amount(val):
                 """
                 Formats a float/dec for DE9 single-box amount fields.
-                Uses literal decimal and minimal nudge.
-                Example: 255.59 -> " 255.59"
+                Uses literal decimal and NO padding.
                 """
                 try:
-                    return f" {float(val):.2f}"
+                    return f"{float(val):.2f}"
                 except:
                     return ""
 
@@ -316,27 +291,31 @@ class TaxFormFiller:
                     field_name = widget.field_name
                     val_to_set = None
 
-                    # Strategy 1: Direct Match (Data Key == PDF Field Name)
+                    # Strategy 1: Direct Match
                     if field_name in data:
                         val_to_set = data[field_name]
 
-                    # Strategy 2: Mapping Match (Internal Key -> PDF Field Name)
+                    # Strategy 2: Mapping Match
                     if val_to_set is None:
                         for internal_key, pdf_key in mapping.items():
                             if pdf_key == field_name and internal_key in data:
                                 val_to_set = data[internal_key]
                                 break
                     
-                    # Apply Formatting for DE9
+                    # Apply Formatting and Alignment for DE9
                     if val_to_set is not None and form_type == "DE9":
-                        # Amount fields that need decimal removal or formatting
+                        # Amount fields that need decimal formatting
                         if any(field_name == mapping.get(k) for k in ["total_wages", "ui_tax", "ett_tax", "sdi_tax", "pit_withheld", "subtotal", "less", "total_taxes_due"]):
                             val_to_set = format_de9_amount(val_to_set)
+                            # Force Right Alignment (Quadding = 2)
+                            doc.xref_set_key(widget.xref, "Q", "2")
                         # Taxable Wages (D2, F2) - Whole Dollars, adding .00
                         elif field_name in ["D2", "F2"]:
                             try:
                                 raw_val = str(val_to_set).strip()
-                                val_to_set = f" {str(int(float(raw_val)))}.00"
+                                val_to_set = f"{str(int(float(raw_val)))}.00"
+                                # Force Right Alignment (Quadding = 2)
+                                doc.xref_set_key(widget.xref, "Q", "2")
                             except:
                                 val_to_set = ""
 
