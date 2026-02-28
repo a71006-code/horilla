@@ -985,8 +985,6 @@ if apps.is_installed("payroll"):
             "ett_wages": round(aggregates["DE9"]["ett_wages"], 2),
             "ett_tax": round(aggregates["DE9"]["ett_tax"], 2),
             "sdi_wages": round(aggregates["DE9"]["sdi_wages"], 2),
-            "F2": sdi_w_d,
-            "F2_cents": "",
             "sdi_tax": round(aggregates["DE9"]["sdi_tax"], 2),
             "subtotal": round(
                 (aggregates["DE9"]["unemployment_insurance_tax"] or 0) + 
@@ -1013,8 +1011,6 @@ if apps.is_installed("payroll"):
         data.update({
             "ui_rate": result.get("ui_rate", "3.4"), 
             "D1": result.get("ui_rate", "3.4"), 
-            "D2": ui_w_d,
-            "D2_cents": "",
             "ett_rate": result.get("ett_rate", "0.1"),
             "E1": result.get("ett_rate", "0.1"), 
             "sdi_rate": result.get("sdi_rate", "1.1"),

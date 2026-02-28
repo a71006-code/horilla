@@ -325,47 +325,20 @@ class TaxFormFiller:
                         for internal_key, pdf_key in mapping.items():
                             if pdf_key == field_name and internal_key in data:
                                 val_to_set = data[internal_key]
-                                
-                                # Special Handling for DE9 Amount Boxes (Rev 1-12)
-                                if form_type == "DE9":
-                                    # Amount fields that need decimal removal and rjust
-                                    if internal_key in ["total_wages", "ui_tax", "ett_tax", "sdi_tax", "pit_withheld", "subtotal", "less", "total_taxes_due"]:
-                                        val_to_set = format_de9_amount(val_to_set)
-                                    # Taxable Wages (D2, F2) - Whole Dollars, adding .00 as requested
-                                    elif internal_key in ["ui_wages", "sdi_wages"]:
-                                        try:
-                                            # Clean the string of existing padding first
-                                            raw_val = str(val_to_set).strip()
-                                            val_to_set = f" {str(int(float(raw_val)))}.00"
-                                        except:
-                                            val_to_set = ""
                                 break
                     
-                    # Strategy 3: Simple Name Fallback
-                    if val_to_set is None:
-                        for internal_key, pdf_key in mapping.items():
-                             if field_name == pdf_key.split('.')[-1].replace('[0]', ''):
-                                 if internal_key in data:
-                                     val_to_set = data[internal_key]
-                                     break
-                    
-                    # Strategy 4: DE9C Dynamic Rows
-                    if val_to_set is None and "employees" in data:
-                        import re
-                        match = re.search(r"(\D+)(\d+)$", field_name)
-                        if match:
-                             field_prefix = match.group(1).strip()
-                             row_index = int(match.group(2)) - 1
-                             employee_list = data["employees"]
-                             
-                             if 0 <= row_index < len(employee_list):
-                                 emp = employee_list[row_index]
-                                 if "SSN" in field_prefix: val_to_set = emp.get("ssn", "")
-                                 elif "First Name" in field_prefix: val_to_set = emp.get("first_name", "")
-                                 elif "Last Name" in field_prefix: val_to_set = emp.get("last_name", "")
-                                 elif "Subject Wages" in field_prefix: val_to_set = emp.get("total_wages", 0.0)
-                                 elif "PIT Wages" in field_prefix: val_to_set = emp.get("pit_wages", 0.0)
-                                 elif "PIT Withheld" in field_prefix: val_to_set = emp.get("pit_withheld", 0.0)
+                    # Apply Formatting for DE9
+                    if val_to_set is not None and form_type == "DE9":
+                        # Amount fields that need decimal removal or formatting
+                        if any(field_name == mapping.get(k) for k in ["total_wages", "ui_tax", "ett_tax", "sdi_tax", "pit_withheld", "subtotal", "less", "total_taxes_due"]):
+                            val_to_set = format_de9_amount(val_to_set)
+                        # Taxable Wages (D2, F2) - Whole Dollars, adding .00
+                        elif field_name in ["D2", "F2"]:
+                            try:
+                                raw_val = str(val_to_set).strip()
+                                val_to_set = f" {str(int(float(raw_val)))}.00"
+                            except:
+                                val_to_set = ""
 
                     if val_to_set is not None:
                         widget.field_value = str(val_to_set)
