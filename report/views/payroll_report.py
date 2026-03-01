@@ -1040,6 +1040,58 @@ if apps.is_installed("payroll"):
             }
             for row in employee_aggregates
         ]
+
+        # DE9C flattening: row 0 fields have no numeric suffix in PDF names,
+        # while rows 1-6 are suffixed (e.g., SSN1..SSN6). We normalize by
+        # always producing indexed internal keys (ssn_0..ssn_6) that mapping handles.
+        de9c_rows = data["employees"][:7]
+
+        for idx in range(7):
+            row = de9c_rows[idx] if idx < len(de9c_rows) else {}
+            first_name = str(row.get("first_name", "") or "").strip()
+            middle_initial = (
+                str(row.get("middle_initial", "") or "").strip()
+                or str(row.get("mi", "") or "").strip()
+                or str(row.get("middle_name", "") or "").strip()[:1]
+            )
+            data.update({
+                f"ssn_{idx}": row.get("ssn", ""),
+                f"first_name_{idx}": first_name,
+                f"mi_{idx}": middle_initial[:1],
+                f"last_name_{idx}": str(row.get("last_name", "") or "").strip(),
+                f"total_subject_wages_{idx}": round(float(row.get("total_wages", 0.0) or 0.0), 2),
+                f"pit_wages_{idx}": round(float(row.get("pit_wages", 0.0) or 0.0), 2),
+                f"pit_withheld_{idx}": round(float(row.get("pit_withheld", 0.0) or 0.0), 2),
+            })
+
+        page_total_subject_wages = round(
+            sum(float(row.get("total_wages", 0.0) or 0.0) for row in de9c_rows), 2
+        )
+        page_total_pit_wages = round(
+            sum(float(row.get("pit_wages", 0.0) or 0.0) for row in de9c_rows), 2
+        )
+        page_total_pit_withheld = round(
+            sum(float(row.get("pit_withheld", 0.0) or 0.0) for row in de9c_rows), 2
+        )
+
+        grand_total_subject_wages = round(
+            sum(float(row.get("total_wages", 0.0) or 0.0) for row in data["employees"]), 2
+        )
+        grand_total_pit_wages = round(
+            sum(float(row.get("pit_wages", 0.0) or 0.0) for row in data["employees"]), 2
+        )
+        grand_total_pit_withheld = round(
+            sum(float(row.get("pit_withheld", 0.0) or 0.0) for row in data["employees"]), 2
+        )
+
+        data.update({
+            "total_subject_wages_this_page": page_total_subject_wages,
+            "total_pit_wages_this_page": page_total_pit_wages,
+            "total_pit_withheld_this_page": page_total_pit_withheld,
+            "grand_total_subject_wages": grand_total_subject_wages,
+            "grand_total_pit_wages": grand_total_pit_wages,
+            "grand_total_pit_withheld": grand_total_pit_withheld,
+        })
         return data
 
     def _fill_tax_forms(form_data, form_types):

@@ -218,6 +218,73 @@ class TaxFormFiller:
              "employer_account_number": "Employer Account No",
              "quarter_ended": "Quarter Ended", 
              "year": "Year",
+             "date_signed": "Date5",
+
+             # Employee rows (template inconsistency: row 0 has no numeric suffix)
+             "ssn_0": "SSN",
+             "first_name_0": "First Name",
+             "mi_0": "MI",
+             "last_name_0": "Last Name",
+             "total_subject_wages_0": "Total Subject Wages",
+             "pit_wages_0": "PIT Wages",
+             "pit_withheld_0": "PIT Withheld",
+
+             # Rows 1-6 use numeric suffixes in field names
+             "ssn_1": "SSN1",
+             "first_name_1": "First Name1",
+             "mi_1": "MI1",
+             "last_name_1": "Last Name1",
+             "total_subject_wages_1": "Total Subject Wages1",
+             "pit_wages_1": "PIT Wages1",
+             "pit_withheld_1": "PIT Withheld1",
+
+             "ssn_2": "SSN2",
+             "first_name_2": "First Name2",
+             "mi_2": "MI2",
+             "last_name_2": "Last Name2",
+             "total_subject_wages_2": "Total Subject Wages2",
+             "pit_wages_2": "PIT Wages2",
+             "pit_withheld_2": "PIT Withheld2",
+
+             "ssn_3": "SSN3",
+             "first_name_3": "First Name3",
+             "mi_3": "MI3",
+             "last_name_3": "Last Name3",
+             "total_subject_wages_3": "Total Subject Wages3",
+             "pit_wages_3": "PIT Wages3",
+             "pit_withheld_3": "PIT Withheld3",
+
+             "ssn_4": "SSN4",
+             "first_name_4": "First Name4",
+             "mi_4": "MI4",
+             "last_name_4": "Last Name4",
+             "total_subject_wages_4": "Total Subject Wages4",
+             "pit_wages_4": "PIT Wages4",
+             "pit_withheld_4": "PIT Withheld4",
+
+             "ssn_5": "SSN5",
+             "first_name_5": "First Name5",
+             "mi_5": "MI5",
+             "last_name_5": "Last Name5",
+             "total_subject_wages_5": "Total Subject Wages5",
+             "pit_wages_5": "PIT Wages5",
+             "pit_withheld_5": "PIT Withheld5",
+
+             "ssn_6": "SSN6",
+             "first_name_6": "First Name6",
+             "mi_6": "MI6",
+             "last_name_6": "Last Name6",
+             "total_subject_wages_6": "Total Subject Wages6",
+             "pit_wages_6": "PIT Wages6",
+             "pit_withheld_6": "PIT Withheld6",
+
+             # Footer totals
+             "total_subject_wages_this_page": "Total Subject Wages This Page",
+             "total_pit_wages_this_page": "Total PIT Wages This Page",
+             "total_pit_withheld_this_page": "Total PIT Withheld This Page",
+             "grand_total_subject_wages": "Grand Total Subject Wages",
+             "grand_total_pit_wages": "Grand Total PIT Wages",
+             "grand_total_pit_withheld": "Grand Total PIT Withheld",
         }
     }
 
