@@ -1016,7 +1016,8 @@ if apps.is_installed("payroll"):
             "sdi_rate": result.get("sdi_rate", "1.1"),
             "F1": result.get("sdi_rate", "1.1"), 
             "quarter": f"{quarter_idx + 1}",
-            "year": f"{reference_date.year}",
+            "year": f"{str(reference_date.year)[-2:]}",  # Last 2 digits for DE9C
+            "Year": f"{str(reference_date.year)[-2:]}",  # Explicitly for DE9C Mapping
             "quarter_ended": f"{(quarter_idx + 1) * 3}/{31 if (quarter_idx + 1) in [1, 4] else 30}/{reference_date.year}",
 
             "employees": []
