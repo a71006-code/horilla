@@ -20,7 +20,7 @@ COPY --from=builder /install /usr/local
 COPY . .
 
 RUN chmod +x /app/entrypoint.sh
-
+RUN mkdir -p /app/staticfiles && chown -R 1026:100 /app
 EXPOSE 8000
 
 CMD ["python3", "manage.py", "runserver"]
