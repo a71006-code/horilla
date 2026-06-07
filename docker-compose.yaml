@@ -8,7 +8,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: "postgres://postgres:postgres@db:5432/horilla"
-      CSRF_TRUSTED_ORIGINS: "http://*,https://*"
+      CSRF_TRUSTED_ORIGINS: "https://pr.uscac.dpdns.org,http://localhost:8000"
     command: sh ./entrypoint.sh
     user: "1026:100"
     volumes:
