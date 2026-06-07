@@ -1158,3 +1158,106 @@ if apps.is_installed("payroll"):
             "report/pdf_editor.html",
             {"pdf_base64": base64.b64encode(pdf_bytes).decode("ascii")},
         )
+
+    def _build_w2_w3_context_from_request(request):
+        from report.forms.year_end_tax import build_w2_w3_context
+
+        raw_year = str(request.GET.get("tax_year", "")).strip()
+        try:
+            tax_year = int(raw_year)
+        except (TypeError, ValueError):
+            tax_year = None
+
+        reference_date = parse_date(request.GET.get("start_date_from", "")) or parse_date(
+            request.GET.get("end_date_from", "")
+        )
+        if not tax_year and reference_date:
+            tax_year = reference_date.year
+        if not tax_year:
+            import datetime
+            tax_year = datetime.date.today().year
+
+        payslips = Payslip.objects.filter(start_date__year=tax_year)
+        selected_company = request.session.get("selected_company")
+        if selected_company and selected_company != "all":
+            payslips = payslips.filter(
+                employee_id__employee_work_info__company_id=selected_company
+            )
+
+        status = request.GET.get("status")
+        if status:
+            payslips = payslips.filter(status=status)
+
+        comp = None
+        if selected_company and selected_company != "all":
+            comp = Company.objects.filter(id=selected_company).first()
+        if not comp:
+            comp = Company.objects.first()
+
+        return build_w2_w3_context(payslips, company=comp, year=tax_year)
+
+    @login_required
+    @permission_required(perm="payroll.view_payslip")
+    def download_w2_w3_csv(request):
+        import io
+        import zipfile
+        from django.http import HttpResponse
+        from report.forms.year_end_tax import generate_w2_csv, generate_w3_csv
+
+        context = _build_w2_w3_context_from_request(request)
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
+            zf.writestr("W2.csv", generate_w2_csv(context))
+            zf.writestr("W3.csv", generate_w3_csv(context))
+
+        response = HttpResponse(zip_buffer.getvalue(), content_type="application/zip")
+        response["Content-Disposition"] = 'attachment; filename="w2_w3_csv.zip"'
+        return response
+
+    @login_required
+    @permission_required(perm="payroll.view_payslip")
+    def download_w2_w3_forms(request):
+        import io
+        import re
+        import zipfile
+        from django.http import HttpResponse
+        from report.forms.tax_forms import TaxFormFiller
+
+        def safe_name(value):
+            cleaned = re.sub(r"[^A-Za-z0-9_-]+", "_", str(value or "").strip())
+            return cleaned.strip("_") or "Employee"
+
+        context = _build_w2_w3_context_from_request(request)
+        filler = TaxFormFiller()
+
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
+            for index, row in enumerate(context.get("w2_rows", []), start=1):
+                try:
+                    pdf_bytes = filler.fill_form("W2", row)
+                except Exception:
+                    continue
+                filename = "W2_{first}_{last}.pdf".format(
+                    first=safe_name(row.get("employee_first_name")),
+                    last=safe_name(row.get("employee_last_name")),
+                )
+                if filename == "W2_Employee_Employee.pdf":
+                    filename = f"W2_Employee_{index}.pdf"
+                zf.writestr(filename, pdf_bytes)
+
+            try:
+                w3_pdf = filler.fill_form("W3", context.get("w3_totals", {}))
+            except Exception:
+                w3_pdf = None
+            if w3_pdf:
+                zf.writestr("W3.pdf", w3_pdf)
+
+            if not zf.namelist():
+                zf.writestr(
+                    "README.txt",
+                    "No W-2/W-3 PDF templates found. Add fw2.pdf and fw3.pdf to report/static/report/forms/.",
+                )
+
+        response = HttpResponse(zip_buffer.getvalue(), content_type="application/zip")
+        response["Content-Disposition"] = 'attachment; filename="w2_w3_forms.zip"'
+        return response

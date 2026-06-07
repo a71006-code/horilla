@@ -79,6 +79,16 @@ if apps.is_installed("payroll"):
                 payroll_report.update_tax_settings,
                 name="update-tax-settings",
             ),
+            path(
+                "download-w2-w3-forms",
+                payroll_report.download_w2_w3_forms,
+                name="download-w2-w3-forms",
+            ),
+            path(
+                "download-w2-w3-csv",
+                payroll_report.download_w2_w3_csv,
+                name="download-w2-w3-csv",
+            ),
         ]
     )
 

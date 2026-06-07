@@ -86,6 +86,13 @@ class Employee(models.Model):
     phone = models.CharField(
         max_length=25,
     )
+    ssn = models.CharField(
+        max_length=11,
+        null=True,
+        blank=True,
+        verbose_name=_("SSN"),
+        help_text=_("Social Security Number used for US year-end payroll forms."),
+    )
     address = models.TextField(max_length=200, blank=True, null=True)
     country = models.CharField(max_length=100, blank=True, null=True)
     state = models.CharField(max_length=100, null=True, blank=True)

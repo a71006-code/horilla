@@ -396,6 +396,14 @@
         <ion-icon name="document-text-outline" class="mr-1"></ion-icon>
         {% trans "Download Tax Forms (PDF)" %}
     </button>
+    <button id="download-w2-w3-forms-btn" class="oh-btn oh-btn--secondary ml-2 mb-2" style="display:none;">
+        <ion-icon name="document-attach-outline" class="mr-1"></ion-icon>
+        {% trans "Download W-2/W-3 (PDF)" %}
+    </button>
+    <button id="download-w2-w3-csv-btn" class="oh-btn oh-btn--secondary ml-2 mb-2" style="display:none;">
+        <ion-icon name="download-outline" class="mr-1"></ion-icon>
+        {% trans "Export W-2/W-3 (CSV)" %}
+    </button>
     <div id="preview-tax-forms-controls" class="d-inline-flex align-items-center ml-2 mb-2" style="display:none;">
         <span class="mr-2">🔍 {% trans "Preview & Edit" %}:</span>
         <button type="button" class="oh-btn oh-btn--secondary oh-btn--small preview-tax-form-btn mr-1" data-form-type="941">Form 941</button>
@@ -424,6 +432,8 @@
             $(".pivot-wrapper").hide();
             $("#download-tax-forms-btn").hide();
             $("#preview-tax-forms-controls").hide();
+            $("#download-w2-w3-forms-btn").hide();
+            $("#download-w2-w3-csv-btn").hide();
 
             // Determine current container and row config
             let containerId = "";
@@ -441,6 +451,8 @@
                 rowsConfig = ["Employee", "Tax Component", "Employer Liability", "Employee Withheld", "Rate"];
                 $("#download-tax-forms-btn").show();
                 $("#preview-tax-forms-controls").css("display", "inline-flex");
+                $("#download-w2-w3-forms-btn").show();
+                $("#download-w2-w3-csv-btn").show();
             } else if (model === "cash_requirement") {
                 containerId = "pivot-cash";
                 rowsConfig = ["Category", "Payee", "Amount"];
@@ -817,6 +829,16 @@
             const formData = $("#filterForm").serialize();
             // window.location.href handles the download
             window.location.href = `download-tax-forms?${formData}`;
+        });
+        $("#download-w2-w3-forms-btn").on("click", function (e) {
+            e.preventDefault();
+            const formData = $("#filterForm").serialize();
+            window.location.href = `download-w2-w3-forms?${formData}`;
+        });
+        $("#download-w2-w3-csv-btn").on("click", function (e) {
+            e.preventDefault();
+            const formData = $("#filterForm").serialize();
+            window.location.href = `download-w2-w3-csv?${formData}`;
         });
         $(".preview-tax-form-btn").on("click", function (e) {
             e.preventDefault();

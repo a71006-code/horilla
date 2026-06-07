@@ -285,6 +285,51 @@ class TaxFormFiller:
              "grand_total_subject_wages": "Grand Total Subject Wages",
              "grand_total_pit_wages": "Grand Total PIT Wages",
              "grand_total_pit_withheld": "Grand Total PIT Withheld",
+         },
+        "W2": {
+            "tax_year": "tax_year",
+            "employer_ein": "employer_ein",
+            "employer_name": "employer_name",
+            "employer_address": "employer_address",
+            "employer_city": "employer_city",
+            "employer_state": "employer_state",
+            "employer_zip": "employer_zip",
+            "employee_ssn": "employee_ssn",
+            "employee_first_name": "employee_first_name",
+            "employee_last_name": "employee_last_name",
+            "employee_address": "employee_address",
+            "employee_city": "employee_city",
+            "employee_state": "employee_state",
+            "employee_zip": "employee_zip",
+            "box_1_wages": "box_1_wages",
+            "box_2_federal_income_tax": "box_2_federal_income_tax",
+            "box_3_social_security_wages": "box_3_social_security_wages",
+            "box_4_social_security_tax": "box_4_social_security_tax",
+            "box_5_medicare_wages": "box_5_medicare_wages",
+            "box_6_medicare_tax": "box_6_medicare_tax",
+            "state_code": "state_code",
+            "box_16_state_wages": "box_16_state_wages",
+            "box_17_state_income_tax": "box_17_state_income_tax",
+            "box_14_label": "box_14_label",
+            "box_14_amount": "box_14_amount",
+        },
+        "W3": {
+            "tax_year": "tax_year",
+            "employer_ein": "employer_ein",
+            "employer_name": "employer_name",
+            "employer_address": "employer_address",
+            "employer_city": "employer_city",
+            "employer_state": "employer_state",
+            "employer_zip": "employer_zip",
+            "employee_count": "employee_count",
+            "box_1_wages": "box_1_wages",
+            "box_2_federal_income_tax": "box_2_federal_income_tax",
+            "box_3_social_security_wages": "box_3_social_security_wages",
+            "box_4_social_security_tax": "box_4_social_security_tax",
+            "box_5_medicare_wages": "box_5_medicare_wages",
+            "box_6_medicare_tax": "box_6_medicare_tax",
+            "box_16_state_wages": "box_16_state_wages",
+            "box_17_state_income_tax": "box_17_state_income_tax",
         }
     }
 
@@ -310,7 +355,11 @@ class TaxFormFiller:
         
         for path in candidates:
             if os.path.exists(path):
-                if os.path.exists(os.path.join(path, "f941.pdf")):
+                template_names = [
+                    self.get_template_filename(form_type)
+                    for form_type in self.FORM_MAPPINGS
+                ]
+                if any(os.path.exists(os.path.join(path, name)) for name in template_names):
                     self.forms_dir = path
                     logger.info(f"[TaxFormFiller] Found valid templates at: {path}")
                     break
@@ -319,6 +368,10 @@ class TaxFormFiller:
             logger.error("[TaxFormFiller] No valid template directory found in candidates.")
             self.forms_dir = path_via_settings 
 
+    @classmethod
+    def get_template_filename(cls, form_type):
+        return f"f{str(form_type).lower()}.pdf"
+
     def fill_form(self, form_type, data):
         """
         Fills a PDF form of the specified type with the provided data.
@@ -326,7 +379,7 @@ class TaxFormFiller:
         if not self.forms_dir:
              raise FileNotFoundError("[TaxFormFiller] Template directory not configured.")
 
-        filename = f"f{form_type.lower()}.pdf" 
+        filename = self.get_template_filename(form_type)
         form_path = os.path.join(self.forms_dir, filename)
         
         if not os.path.exists(form_path):
