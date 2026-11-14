@@ -1,0 +1,136 @@
+{% extends "index.html" %}
+
+{% block content %}
+<section class="oh-card m-3 p-4">
+  <h1>California year-end payroll worksheet</h1>
+  <p>Draft for reconciliation. This worksheet covers recorded regular cash payroll only. Check completeness, reconcile it to filed quarterly returns, and verify tax IDs and any other required boxes before filing.</p>
+  <form method="get">
+    {{ selection.as_p }}
+    <button class="oh-btn oh-btn--primary" type="submit">Show year</button>
+  </form>
+  {% if worksheet_error %}<p role="alert">{{ worksheet_error }}</p>{% endif %}
+  {% if worksheet %}
+    <h2>{{ employer }} · {{ year }}</h2>
+    <p>{{ worksheet.check_count }} reviewed check{{ worksheet.check_count|pluralize }}.</p>
+    <a class="oh-btn oh-btn--secondary" href="?employer={{ employer.pk }}&amp;year={{ year }}&amp;export=csv">Download draft CSV</a>
+    <a href="{% url 'ca-reviewed-reports' %}?employer={{ employer.pk }}">Report history</a>
+    <h3>W-2 wages and withholding by employee</h3>
+    <div style="overflow-x: auto">
+      <table class="oh-table">
+        <thead><tr><th scope="col">Employee record ID</th>{% for label in box_labels %}<th scope="col">{{ label }}</th>{% endfor %}</tr></thead>
+        <tbody>{% for employee, boxes in worksheet.employees.items %}
+          <tr><th scope="row">{{ employee }}</th>{% for amount in boxes.values %}<td>${{ amount|floatformat:2 }}</td>{% endfor %}</tr>
+        {% empty %}<tr><td colspan="10">No reviewed checks.</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+    {% if w2_handoff %}
+      <h3>Review additional 2026 W-2 entries</h3>
+      <p>Use year-end records to verify these entries. Omitted fields stay unresolved. A preview applies only to this download.</p>
+      <p>For Box 7, enter the Social Security tips already included in recorded wages, from Q1 through Q4. For TP, enter all reported cash tips. For TT, enter only the premium required by FLSA section 7. For Box 14b, enter up to two occupation codes, including 000 if any tips came from a nonqualifying occupation.</p>
+      <p><a href="https://www.irs.gov/instructions/iw2w3">2026 IRS W-2/W-3 instructions</a> · <a href="https://www.irs.gov/tippedoccupations">IRS occupation codes</a> · <a href="https://edd.ca.gov/siteassets/files/pdf_pub_ctr/de44.pdf">California employer guide</a></p>
+      <details>
+        <summary>Entry format and examples</summary>
+        <p>Replace 42 with the employee record ID shown above. Use 0 or none only after verifying the field does not apply. Enter other Box 12 codes as current-year amounts.</p>
+        <pre>42,7,25.00 0 0 0
+42,8,0
+42,10,0
+42,11,0
+42,TP,25.00
+42,TT,60.00
+42,12,D=125.00 DD=900.00
+42,13,retirement
+42,14b,102</pre>
+        <p>For an employee with no applicable Box 12 codes beyond TP and TT, enter <code>42,12,none</code>. Box 13 accepts <code>statutory</code>, <code>retirement</code>, <code>sick</code>, or <code>none</code>. Separate multiple selections or occupation codes with spaces. When TP is zero, omit the Box 14b line.</p>
+      </details>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="employer" value="{{ employer.pk }}">
+        <input type="hidden" name="year" value="{{ year }}">
+        <input type="hidden" name="action" value="preview_w2">
+        {{ w2_form.as_p }}
+        <button class="oh-btn oh-btn--primary" type="submit">Preview W-2/W-3 entries</button>
+        {% if w2_preview %}
+          <button class="oh-btn oh-btn--secondary" type="submit" name="export" value="csv">Download draft CSV with reviewed entries</button>
+          <input type="hidden" name="archive_token" value="{{ archive_token }}">
+          <button class="oh-btn oh-btn--secondary" type="submit" name="export" value="archive">Save reviewed draft</button>
+        {% endif %}
+      </form>
+      {% for employee, entries in w2_handoff %}
+        <details>
+          <summary>Additional W-2 entries · Employee record {{ employee }}</summary>
+          <dl>{% for label, value in entries %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% endfor %}</dl>
+        </details>
+      {% endfor %}
+    {% endif %}
+    <h3>W-3 totals from employee rows</h3>
+    <p>Use the employer's verified name, address, EIN and California employer account, and each employee's verified legal name, address and Social Security number. Verify the W-3 employer type, contact details and total number of forms transmitted. <a href="{% url 'ca-filing-profile' %}?employer={{ employer.pk }}">Open filing profile and employee identity records</a></p>
+    <p>Reconcile any payments or wage adjustments outside the recorded cash payroll, including third-party sick pay, in the filing software.</p>
+    <dl>{% for label, amount in w3_rows %}<dt>{{ label }}</dt><dd>{{ amount }}</dd>{% endfor %}</dl>
+    <h3>Compare against filed 941 and DE 9C amounts</h3>
+    <p>Copy the filed amounts for each completed quarter for the verified EIN and EDD account. Use corrected totals if you filed amendments. Enter zero only when the filed amount is zero or blank.</p>
+    {% if profile %}
+      <p>{{ profile.legal_name }} · EIN {{ profile.masked_ein }} · EDD {{ profile.masked_edd_account }}</p>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="employer" value="{{ employer.pk }}">
+        <input type="hidden" name="year" value="{{ year }}">
+        {{ filed_form.as_p }}
+        <button class="oh-btn oh-btn--primary" type="submit" name="action" value="filed_totals">Record filed totals</button>
+      </form>
+    {% else %}
+      <p>Set up the verified Form 941 employer profile to enter filed amounts. <a href="{% url 'ca-filing-profile' %}?employer={{ employer.pk }}">Open filing profile</a></p>
+    {% endif %}
+    <p>Check all four quarters and review each employee’s DE 9C figures. The comparison uses the recorded wage amounts and any Social Security tip split entered above. The FICA comparison adds actual employee withholding to the employer share calculated on quarterly wages. Compare it with Form 941 lines 5e and 7. Nonzero amounts on lines 8 or 9 require preparer review.</p>
+    {% for quarter, comparison in filed_comparison.items %}
+      <details {% if comparison.rows and comparison.status != "Matched" %}open{% endif %}>
+        <summary>Q{{ quarter }} · {{ comparison.status }}</summary>
+        <p><a href="{% url 'ca-de9c-reconciliation' %}?employer={{ employer.pk }}&amp;quarter={{ quarter }}">Compare Q{{ quarter }} employee DE 9C rows</a></p>
+        {% if comparison.rows %}
+          <p>Filed totals recorded {{ comparison.reviewed_at }}.</p>
+          <table class="oh-table">
+            <thead><tr><th scope="col">Comparison</th><th scope="col">Recorded</th><th scope="col">Filed</th><th scope="col">Difference</th></tr></thead>
+            <tbody>{% for label, recorded, filed, difference in comparison.rows %}
+              <tr><th scope="row">{{ label }}</th><td>{{ recorded|floatformat:2 }}</td><td>{{ filed|floatformat:2 }}</td><td>{{ difference|floatformat:2 }}</td></tr>
+            {% endfor %}</tbody>
+          </table>
+        {% else %}
+          <p>Filed totals are missing for this quarter and employer profile.</p>
+        {% endif %}
+      </details>
+    {% endfor %}
+    <p>Employee DE 9C PIT reconciliation</p>
+    <ul>{% for quarter, status in employee_de9c.items %}<li>Q{{ quarter }} · {{ status }}</li>{% endfor %}</ul>
+    <h3>FUTA amounts for Form 940 reconciliation</h3>
+    <dl>{% for label, amount in futa_rows %}<dt>{{ label }}</dt><dd>${{ amount|floatformat:2 }}</dd>{% endfor %}</dl>
+    <table class="oh-table">
+      <thead><tr><th scope="col">Paid quarter</th><th scope="col">FUTA taxable wages</th><th scope="col">Gross FUTA before credits</th></tr></thead>
+      <tbody>{% for quarter, amounts in worksheet.futa_quarters.items %}
+        <tr><th scope="row">Q{{ quarter }}</th><td>${{ amounts.taxable_wages|floatformat:2 }}</td><td>${{ amounts.before_credits|floatformat:2 }}</td></tr>
+      {% endfor %}</tbody>
+    </table>
+    <p>Recorded 940 deposits allocated to {{ year }}: ${{ deposit_total|floatformat:2 }}.</p>
+    <h3>Prepare the Form 940 summary</h3>
+    <p>Use the verified California unemployment payments. For partial exclusions or late payments, enter the preparer’s line 10 worksheet result and the FUTA wage base also covered by California UI. Leave the Schedule A rate blank until the final rate is published.</p>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="employer" value="{{ employer.pk }}">
+      <input type="hidden" name="year" value="{{ year }}">
+      <input type="hidden" name="action" value="preview_940">
+      {{ form_940.as_p }}
+      <button class="oh-btn oh-btn--primary" type="submit">Preview Form 940 summary</button>
+      {% if summary_940 %}
+        <button class="oh-btn oh-btn--secondary" type="submit" name="export" value="csv">Download draft CSV with Form 940</button>
+        <input type="hidden" name="archive_token" value="{{ archive_token }}">
+        <button class="oh-btn oh-btn--secondary" type="submit" name="export" value="archive">Save reviewed draft</button>
+      {% endif %}
+    </form>
+    {% if summary_940 %}
+      {% if summary_940.status %}<p role="status">{{ summary_940.status }}</p>{% endif %}
+      <dl>{% for line, label, amount in form_940_rows %}
+        <dt>Line {{ line }} · {{ label }}</dt><dd>${{ amount|floatformat:2 }}</dd>
+      {% endfor %}</dl>
+    {% endif %}
+  {% endif %}
+  {% if employer %}{% include "report/ca_worksheet_deposits.html" %}{% endif %}
+</section>
+{% endblock content %}

@@ -1,0 +1,70 @@
+{% extends "index.html" %}
+
+{% block content %}
+<section class="oh-card m-3 p-4">
+  <h1>California DE 9C employee reconciliation</h1>
+  <p>Compare filed employee wages, withholding and wage plan codes with reviewed checks by actual payment date.</p>
+  <form method="get">
+    {{ selection.as_p }}
+    <button class="oh-btn oh-btn--primary" type="submit">Show quarter</button>
+  </form>
+  {% if employer %}
+    <h2>{{ employer }} · 2026 Q{{ quarter }}</h2>
+    {% if profile %}
+      <p>{{ profile.legal_name }} · EDD account {{ profile.masked_edd_account }}</p>
+    {% else %}
+      <p><a href="{% url 'ca-filing-profile' %}?employer={{ employer.pk }}">Verify the employer filing profile</a> before recording a filed DE 9C.</p>
+    {% endif %}
+    {% if prior_profile_filing %}
+      <p role="alert">The employer filing profile changed after the previous transcription. Verify and record the filed rows again.</p>
+    {% endif %}
+    {% if worksheet_error %}
+      <p role="alert">{{ worksheet_error }}</p>
+    {% endif %}
+    {% if comparison %}
+      <p role="status">{{ comparison.status }}{% if current %} · Transcribed {{ current.reviewed_at }}{% endif %}.</p>
+      {% if comparison.coverage %}<p>{{ comparison.coverage }}.</p>{% endif %}
+      <p>Differences are filed amounts minus recorded amounts.</p>
+      <a class="oh-btn oh-btn--secondary" href="?employer={{ employer.pk }}&amp;quarter={{ quarter }}&amp;export=csv">Download reconciliation CSV</a>
+      <div class="table-responsive">
+        <table class="oh-table">
+          <thead><tr>
+            <th scope="col">Employee record ID</th><th scope="col">Status</th>
+            <th scope="col">Recorded PIT wages</th><th scope="col">Filed PIT wages</th><th scope="col">Wage difference</th>
+            <th scope="col">Recorded PIT withheld</th><th scope="col">Filed PIT withheld</th><th scope="col">Withholding difference</th>
+            <th scope="col">Recorded subject wages</th><th scope="col">Filed subject wages</th><th scope="col">Subject wages difference</th>
+            <th scope="col">Recorded wage plan</th><th scope="col">Filed wage plan</th>
+          </tr></thead>
+          <tbody>
+          {% for row in comparison.rows %}
+            <tr>
+              <th scope="row">{{ row.employee_id }}{% if row.employee_name %} · {{ row.employee_name }}{% endif %}</th>
+              <td>{{ row.status }}</td>
+              <td>{{ row.recorded_wages|floatformat:2 }}</td><td>{{ row.filed_wages|floatformat:2 }}</td><td>{{ row.wages_difference|floatformat:2 }}</td>
+              <td>{{ row.recorded_withheld|floatformat:2 }}</td><td>{{ row.filed_withheld|floatformat:2 }}</td><td>{{ row.withheld_difference|floatformat:2 }}</td>
+              <td>{{ row.recorded_subject_wages|floatformat:2 }}</td><td>{{ row.filed_subject_wages|floatformat:2 }}</td><td>{{ row.subject_wages_difference|floatformat:2 }}</td>
+              <td>{{ row.recorded_plan_code|default_if_none:"" }}</td><td>{{ row.filed_plan_code|default_if_none:"" }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="13">There are no employee rows to compare.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+    {% if can_record %}
+      <h3>Record filed DE 9C employee amounts</h3>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="employer" value="{{ employer.pk }}">
+        <input type="hidden" name="quarter" value="{{ quarter }}">
+        {{ filing.as_p }}
+        <button class="oh-btn oh-btn--primary" type="submit">Record filed rows</button>
+      </form>
+    {% elif profile %}
+      <p>Record a filed DE 9C after the quarter ends.</p>
+    {% endif %}
+    <p><a href="{% url 'ca-quarterly-worksheet' %}?employer={{ employer.pk }}&amp;quarter={{ quarter }}">Open quarterly worksheet</a></p>
+  {% endif %}
+</section>
+{% endblock content %}

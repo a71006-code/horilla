@@ -3,9 +3,15 @@ import io
 from datetime import date
 from unittest.mock import MagicMock, patch
 
-from django.test import TestCase
+from django.contrib.admin import AdminSite
+from django.core.exceptions import PermissionDenied
+from django.test import RequestFactory, TestCase
 
+from employee.admin import EmployeeAdmin
+from employee.forms import EmployeeForm
 from employee.models import Employee
+from employee.views import employee_export, save_employee_bulk_update, view_employee_bulk_update
+from horilla_api.api_serializers.employee.serializers import EmployeeSerializer
 
 from report.forms.year_end_tax import (
     build_w2_w3_context,
@@ -21,6 +27,35 @@ class EmployeeTaxIdentityFieldTest(TestCase):
         self.assertEqual(field.max_length, 11)
         self.assertTrue(field.blank)
         self.assertTrue(field.null)
+
+    def test_generic_employee_edit_and_api_exclude_ssn(self):
+        self.assertNotIn("ssn", EmployeeForm.base_fields)
+        self.assertNotIn("ssn", EmployeeSerializer().fields)
+        request = RequestFactory().get("/admin/employee/")
+        request.user = MagicMock(is_superuser=False)
+        self.assertIn("ssn", EmployeeAdmin(Employee, AdminSite()).get_exclude(request))
+
+    def test_generic_employee_export_and_bulk_update_exclude_ssn(self):
+        factory = RequestFactory()
+        user = MagicMock()
+        request = factory.get("/employee/export/")
+        request.user = user
+        request.session = {}
+        with (
+            patch("employee.views.Employee.objects.values_list", return_value=[]) as selected_fields,
+            patch("employee.views.pd.DataFrame"),
+        ):
+            self.assertEqual(employee_export(request).status_code, 200)
+        self.assertNotIn("ssn", selected_fields.call_args.args)
+        for view, fields in (
+            (view_employee_bulk_update, ["ssn"]),
+            (save_employee_bulk_update, '["ssn"]'),
+        ):
+            request = factory.post("/employee/bulk/", {"update_fields": fields})
+            request.user = user
+            request.session = {}
+            with self.assertRaises(PermissionDenied):
+                view(request)
 
 
 class YearEndTaxExportHelperTest(TestCase):
@@ -108,6 +143,7 @@ class YearEndTaxExportHelperTest(TestCase):
         self.assertEqual(row["box_6_medicare_tax"], 21.75)
         self.assertEqual(row["box_16_state_wages"], 180000.0)
         self.assertEqual(row["box_17_state_income_tax"], 15.0)
+        self.assertEqual(row["box_14_label"], "CASDI")
 
         w3 = context["w3_totals"]
         self.assertEqual(w3["employee_count"], 1)

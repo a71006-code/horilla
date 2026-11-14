@@ -2,6 +2,15 @@ from django.utils.translation import gettext as _
 from payroll.models.models import Payslip, Deduction
 from django.db.models import Sum
 
+
+def taxable_gross_from_pay_head(pay_head_data, fallback):
+    """Read both current scalar and historical nested payslip payloads."""
+    wages = pay_head_data.get("taxable_gross_pay", fallback)
+    if isinstance(wages, dict):
+        wages = wages.get("taxable_gross_pay", fallback)
+    return wages
+
+
 def calculate_tax_liability(payslips, company=None):
     """
     Calculates employer tax liability and employee withholdings for the provided payslips.
@@ -215,8 +224,8 @@ def calculate_tax_liability(payslips, company=None):
             # Base Amount
             base_amount = gross # Default
             if config["based_on"] == "basic_pay": base_amount = safefloat(item["basic_pay"])
-            elif config["based_on"] == "taxable_gross_pay": 
-                 base_amount = safefloat(ph_data.get("taxable_gross_pay", {}).get("taxable_gross_pay", gross))
+            elif config["based_on"] == "taxable_gross_pay":
+                base_amount = safefloat(taxable_gross_from_pay_head(ph_data, gross))
 
             # --- Calculate Employer Liability with LIMITS ---
             liability_amount = 0.0

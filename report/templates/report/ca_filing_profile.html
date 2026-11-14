@@ -1,0 +1,39 @@
+{% extends "index.html" %}
+{% block content %}
+<section class="oh-card m-3 p-4">
+  <h1>California employer filing profile · 2026</h1>
+  <form method="get">
+    <label for="employer-select">Employer</label>
+    <select id="employer-select" name="employer" required>
+      <option value="">Select a legal employer</option>
+      {% for company in companies %}<option value="{{ company.pk }}" {% if company.pk == employer.pk %}selected{% endif %}>{{ company }}</option>{% endfor %}
+    </select>
+    <button class="oh-btn oh-btn--secondary" type="submit">Open profile</button>
+  </form>
+  {% if employer %}
+    {% if profile %}<p>Last verified on {{ profile.reviewed_at }}.</p>{% endif %}
+    <p>Use the employer’s IRS and EDD records. Verify which federal return applies before reviewing quarterly totals.</p>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="employer" value="{{ employer.pk }}">
+      {{ form.as_p }}
+      <button class="oh-btn oh-btn--primary" type="submit">Save verified profile</button>
+    </form>
+    <h2>Employee filing identities</h2>
+    <p>Match the employee record IDs in the worksheets to these records. Open the protected admin record to verify the full SSN, name, and mailing address.</p>
+    <table class="oh-table">
+      <thead><tr><th scope="col">Employee record ID</th><th scope="col">Name on record</th><th scope="col">SSN</th></tr></thead>
+      <tbody>
+        {% for employee in employee_identities %}
+          <tr>
+            <th scope="row">{{ employee.id }}</th>
+            <td><a href="{% url 'admin:employee_employee_change' employee.id %}">{{ employee.name }}</a></td>
+            <td>{{ employee.masked_ssn|default:"Missing or invalid format" }}</td>
+          </tr>
+        {% empty %}<tr><td colspan="3">No recorded paid checks for this employer and year.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+  <a href="{% url 'ca-quarterly-worksheet' %}">Back to quarterly worksheet</a>
+</section>
+{% endblock %}

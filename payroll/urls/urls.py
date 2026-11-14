@@ -8,6 +8,7 @@ from django.urls import include, path
 
 from payroll.models.models import Contract, Payslip
 from payroll.views import views
+from payroll.views.ca_paycheck_review import review_ca_paycheck
 
 urlpatterns = [
     path("", include("payroll.urls.component_urls")),
@@ -52,6 +53,7 @@ urlpatterns = [
         name="single-contract-view",
     ),
     path("payslip-pdf/<int:id>", views.payslip_pdf, name="payslip-pdf"),
+    path("payslips/<int:payslip_id>/california-review/", review_ca_paycheck, name="review-ca-paycheck"),
     path("contract-filter", views.contract_filter, name="contract-filter"),
     path("settings", views.settings, name="payroll-settings"),
     path(

@@ -1,0 +1,128 @@
+{% extends "index.html" %}
+
+{% block content %}
+<section class="oh-card m-3 p-4">
+  <h1>California quarterly payroll worksheet</h1>
+  <p>Draft for reconciliation. Verify the complete payroll register and agency deposits before using these figures for filing.</p>
+  <form method="get">
+    {{ selection.as_p }}
+    <button class="oh-btn oh-btn--primary" type="submit">Show quarter</button>
+  </form>
+
+  {% if employer %}
+    <h2>{{ employer }} · 2026 Q{{ quarter }}</h2>
+    {% if worksheet_error %}<p role="alert">{{ worksheet_error }}</p>{% endif %}
+    {% if worksheet %}
+      <p>{{ worksheet.check_count }} reviewed check{{ worksheet.check_count|pluralize }}.</p>
+      <p>Recorded gross pay: ${{ recorded_gross_pay|floatformat:2 }}.</p>
+      <a class="oh-btn oh-btn--secondary" href="?employer={{ employer.pk }}&amp;quarter={{ quarter }}&amp;export=csv">Download draft CSV</a>
+      <a href="{% url 'ca-reviewed-reports' %}?employer={{ employer.pk }}">Report history</a>
+      <dl>
+        <dt>Federal liability before adjustments and credits</dt><dd>${{ worksheet.federal_tax_before_adjustments|floatformat:2 }}</dd>
+        <dt>IRS 941 deposits allocated to this quarter</dt><dd>${{ worksheet.federal_deposits|floatformat:2 }}</dd>
+        <dt>California liability before adjustments and credits</dt><dd>${{ worksheet.california_tax_before_adjustments|floatformat:2 }}</dd>
+        <dt>EDD DE 9 deposits allocated to this quarter</dt><dd>${{ worksheet.california_deposits|floatformat:2 }}</dd>
+      </dl>
+      <h3>Tax wages and amounts from recorded checks</h3>
+      <dl>
+        <dt>Federal income tax wages / withheld</dt><dd>${{ worksheet.totals.federal_income_tax_wages|floatformat:2 }} / ${{ worksheet.totals.federal_income_tax|floatformat:2 }}</dd>
+        <dt>Social Security wages / employee tax / employer tax</dt><dd>${{ worksheet.totals.social_security_wages|floatformat:2 }} / ${{ worksheet.totals.employee_social_security|floatformat:2 }} / ${{ worksheet.totals.employer_social_security|floatformat:2 }}</dd>
+        <dt>Medicare wages / employee tax / employer tax</dt><dd>${{ worksheet.totals.medicare_wages|floatformat:2 }} / ${{ worksheet.totals.employee_medicare|floatformat:2 }} / ${{ worksheet.totals.employer_medicare|floatformat:2 }}</dd>
+        <dt>Additional Medicare wages / employee tax</dt><dd>${{ worksheet.totals.additional_medicare_wages|floatformat:2 }} / ${{ worksheet.totals.employee_additional_medicare|floatformat:2 }}</dd>
+        <dt>California PIT wages / withheld</dt><dd>${{ worksheet.totals.ca_pit_wages|floatformat:2 }} / ${{ worksheet.totals.ca_pit_withheld|floatformat:2 }}</dd>
+        <dt>California SDI wages / withheld</dt><dd>${{ worksheet.totals.ca_sdi_wages|floatformat:2 }} / ${{ worksheet.totals.employee_ca_sdi|floatformat:2 }}</dd>
+        <dt>California UI taxable wages / employer tax</dt><dd>${{ worksheet.totals.ca_ui_wages|floatformat:2 }} / ${{ worksheet.totals.employer_ca_ui|floatformat:2 }}</dd>
+        <dt>California ETT taxable wages / employer tax</dt><dd>${{ worksheet.totals.ca_ett_wages|floatformat:2 }} / ${{ worksheet.totals.employer_ca_ett|floatformat:2 }}</dd>
+      </dl>
+      <h3>Federal liability by month of payment</h3>
+      <ul>
+        {% for month, amount in worksheet.monthly_federal_liability.items %}
+          <li>Month {{ month }} · ${{ amount|floatformat:2 }}</li>
+        {% empty %}<li>No recorded payments.</li>{% endfor %}
+      </ul>
+      <details>
+        <summary>Federal liability by payment date</summary>
+        <ul>{% for day, amount in worksheet.daily_federal_liability.items %}
+          <li>{{ day|date:"Y-m-d" }} · ${{ amount|floatformat:2 }}</li>
+        {% empty %}<li>No recorded payments.</li>{% endfor %}</ul>
+      </details>
+      <h3>California PIT by employee</h3>
+      <table class="oh-table">
+        <thead><tr><th>Employee record ID</th><th>PIT wages</th><th>PIT withheld</th></tr></thead>
+        <tbody>{% for employee, amounts in worksheet.employees.items %}
+          <tr><td>{{ employee }}</td><td>${{ amounts.pit_wages|floatformat:2 }}</td><td>${{ amounts.pit_withheld|floatformat:2 }}</td></tr>
+        {% empty %}<tr><td colspan="3">No reviewed checks.</td></tr>{% endfor %}</tbody>
+      </table>
+      <h3>DE 9C subject wages by employee</h3>
+      <p><a href="{% url 'ca-de9c-reconciliation' %}?employer={{ employer.pk }}&amp;quarter={{ quarter }}">Compare with filed employee DE 9C totals</a></p>
+      {% if worksheet.missing_de9c_check_count %}
+        <p role="alert">{{ worksheet.missing_de9c_check_count }} recorded check{{ worksheet.missing_de9c_check_count|pluralize }} have missing or inconsistent EDD subject wages or plan codes. The rows below are partial.</p>
+      {% endif %}
+      <p>Recorded subject wages included below: ${{ worksheet.edd_subject_wages|floatformat:2 }}. Monthly headcounts and protected filing identifiers still require review.</p>
+      <table class="oh-table">
+        <thead><tr><th>Employee record ID</th><th>Plan</th><th>Subject wages</th><th>PIT wages</th><th>PIT withheld</th></tr></thead>
+        <tbody>{% for row in worksheet.de9c_rows %}
+          <tr><td>{{ row.employee_id }}</td><td>{{ row.plan_code }}</td><td>${{ row.subject_wages|floatformat:2 }}</td><td>${{ row.pit_wages|floatformat:2 }}</td><td>${{ row.pit_withheld|floatformat:2 }}</td></tr>
+        {% empty %}<tr><td colspan="5">No checks with verified subject wages and a plan code.</td></tr>{% endfor %}</tbody>
+      </table>
+      {% if profile.federal_return == "941" or returns_form.is_bound %}
+        <h3>Prepare Form 941 and DE 9 summaries</h3>
+        <p>Enter current-quarter adjustments and applied credits. Leave inapplicable adjustments blank. The DE 9 balance requires both verified rates and complete subject wages.</p>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="employer" value="{{ employer.pk }}">
+          <input type="hidden" name="quarter" value="{{ quarter }}">
+          <input type="hidden" name="action" value="preview_returns">
+          {{ returns_form.as_p }}
+          <button type="submit" class="oh-btn oh-btn--primary">Preview quarterly return summaries</button>
+          {% if return_rows %}
+            <button type="submit" name="export" value="csv" class="oh-btn oh-btn--secondary">Download CSV with return summaries</button>
+            <input type="hidden" name="archive_token" value="{{ archive_token }}">
+            <button type="submit" name="export" value="archive" class="oh-btn oh-btn--secondary">Save reviewed draft</button>
+          {% endif %}
+        </form>
+        {% if return_rows %}
+          {% if schedule_needs_reconciliation %}
+            <p role="alert">The adjusted liability schedule must tie to line 12 before it can be exported.</p>
+          {% endif %}
+          {% for report, rows in return_rows.items %}
+            <h4>{{ report }}</h4>
+            <table class="oh-table">
+              <thead><tr><th scope="col">Line</th><th scope="col">Description</th><th scope="col">Amount</th></tr></thead>
+              <tbody>{% for line, label, amount in rows %}
+                <tr><th scope="row">{{ line }}</th><td>{{ label }}</td><td>{{ amount|floatformat:2 }}</td></tr>
+              {% endfor %}</tbody>
+            </table>
+          {% endfor %}
+        {% endif %}
+      {% endif %}
+    {% endif %}
+
+    <h3>Quarter review</h3>
+    {% if profile %}
+      <p>{{ profile.legal_name }} · EIN {{ profile.masked_ein }} · EDD account {{ profile.masked_edd_account }} · {{ profile.get_federal_return_display }}</p>
+    {% else %}<p>Verify the employer’s filing profile before reviewing this quarter.</p>{% endif %}
+    <p><a href="{% url 'ca-filing-profile' %}?employer={{ employer.pk }}">Open employer filing profile</a></p>
+    {% if review_is_current %}
+      <p role="status">Recorded sources reconciled on {{ latest_review.reviewed_at }}. This worksheet remains a draft.</p>
+      <dl>
+        <dt>941 schedule</dt><dd>{{ latest_review.get_deposit_schedule_display }}</dd>
+        <dt>941 line 1 headcount</dt><dd>{{ latest_review.federal_headcount }}</dd>
+        <dt>DE 9C monthly headcounts</dt><dd>{{ latest_review.edd_headcounts.0 }} / {{ latest_review.edd_headcounts.1 }} / {{ latest_review.edd_headcounts.2 }}</dd>
+      </dl>
+    {% elif latest_review %}<p role="alert">The recorded sources changed after the last review. Reconcile the quarter again.</p>{% endif %}
+    {% if profile.federal_return == "941" and worksheet and not worksheet.missing_de9c_check_count %}
+      <p>Enter the independent totals from the payroll register and confirmed deposits. The review applies to the currently recorded checks and deposits.</p>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="employer" value="{{ employer.pk }}">
+        <input type="hidden" name="quarter" value="{{ quarter }}">
+        {{ review_form.as_p }}
+        <button type="submit" name="action" value="review" class="oh-btn oh-btn--primary">Record quarter review</button>
+      </form>
+    {% endif %}
+
+    {% include "report/ca_worksheet_deposits.html" %}
+  {% endif %}
+</section>
+{% endblock content %}

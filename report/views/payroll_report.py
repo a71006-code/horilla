@@ -1,7 +1,9 @@
 from django.apps import apps
+from django.core.exceptions import PermissionDenied
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils.dateparse import parse_date
+from django.views.decorators.cache import never_cache
 
 if apps.is_installed("payroll"):
     import base64
@@ -9,6 +11,7 @@ if apps.is_installed("payroll"):
     from base.models import Company
     from horilla.decorators import login_required, permission_required
     from payroll.filters import PayslipFilter
+    from payroll.methods.tax_reporting import taxable_gross_from_pay_head
     from payroll.models.models import Payslip
     from payroll.models.tax_models import PayrollSettings
 
@@ -599,8 +602,8 @@ if apps.is_installed("payroll"):
                             base = 0.0
                             if ded_config["based_on"] == "gross_pay": base = float(item["gross_pay"] or 0)
                             elif ded_config["based_on"] == "basic_pay": base = float(item["basic_pay"] or 0)
-                            elif ded_config["based_on"] == "taxable_gross_pay": 
-                                base = float(ph_data.get("taxable_gross_pay", {}).get("taxable_gross_pay", item["gross_pay"] or 0))
+                            elif ded_config["based_on"] == "taxable_gross_pay":
+                                base = float(taxable_gross_from_pay_head(ph_data, item["gross_pay"] or 0))
                             
                             employer_share = (base * rate) / 100.0
                     
@@ -1112,7 +1115,10 @@ if apps.is_installed("payroll"):
 
     @login_required
     @permission_required(perm="payroll.view_payslip")
+    @never_cache
     def download_tax_forms(request):
+        if not request.user.is_active or not request.user.is_superuser:
+            raise PermissionDenied
         import io
         import zipfile
         from django.http import HttpResponse
@@ -1136,7 +1142,10 @@ if apps.is_installed("payroll"):
 
     @login_required
     @permission_required(perm="payroll.view_payslip")
+    @never_cache
     def preview_tax_form(request):
+        if not request.user.is_active or not request.user.is_superuser:
+            raise PermissionDenied
         form_type = str(request.GET.get("form_type", "941")).strip().upper()
         if form_type not in TAX_FORM_TYPES:
             return JsonResponse(
@@ -1198,7 +1207,10 @@ if apps.is_installed("payroll"):
 
     @login_required
     @permission_required(perm="payroll.view_payslip")
+    @never_cache
     def download_w2_w3_csv(request):
+        if not request.user.is_active or not request.user.is_superuser:
+            raise PermissionDenied
         import io
         import zipfile
         from django.http import HttpResponse
@@ -1216,7 +1228,10 @@ if apps.is_installed("payroll"):
 
     @login_required
     @permission_required(perm="payroll.view_payslip")
+    @never_cache
     def download_w2_w3_forms(request):
+        if not request.user.is_active or not request.user.is_superuser:
+            raise PermissionDenied
         import io
         import re
         import zipfile

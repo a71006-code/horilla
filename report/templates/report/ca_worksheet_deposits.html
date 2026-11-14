@@ -1,0 +1,30 @@
+    <h3>Confirmed deposits</h3>
+    {{ void_form.errors }}
+    <ul>{% for deposit in deposits %}
+      <li>{{ deposit.get_kind_display }} · {{ deposit.deposited_on|date:"Y-m-d" }} · ${{ deposit.amount|floatformat:2 }} · {{ deposit.reference }}
+        {% if deposit.voided_at %}
+          · Voided: {{ deposit.void_reason }}
+        {% else %}
+          <details>
+            <summary>Void a mistaken entry</summary>
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="employer" value="{{ employer.pk }}">
+              {% if quarter %}<input type="hidden" name="quarter" value="{{ quarter }}">{% else %}<input type="hidden" name="year" value="{{ year }}">{% endif %}
+              <input type="hidden" name="deposit_id" value="{{ deposit.pk }}">
+              <label>Reason <input type="text" name="reason" maxlength="200" required></label>
+              <button type="submit" name="action" value="void">Void entry</button>
+            </form>
+          </details>
+        {% endif %}
+      </li>
+    {% empty %}<li>No deposit confirmations recorded for this period.</li>{% endfor %}</ul>
+    <h3>Record an external deposit</h3>
+    <p>This records a payment you already made. Use the agency confirmation and the period to which the agency applied it.</p>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="employer" value="{{ employer.pk }}">
+      {% if quarter %}<input type="hidden" name="quarter" value="{{ quarter }}">{% else %}<input type="hidden" name="year" value="{{ year }}">{% endif %}
+      {{ deposit_form.as_p }}
+      <button class="oh-btn oh-btn--primary" type="submit">Record confirmed deposit</button>
+    </form>

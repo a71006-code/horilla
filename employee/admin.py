@@ -65,6 +65,12 @@ class EmployeeAdmin(admin.ModelAdmin):
 
     ordering = ("employee_first_name", "employee_last_name")
 
+    def get_exclude(self, request, obj=None):
+        excluded = super().get_exclude(request, obj)
+        if not request.user.is_superuser:
+            return (*excluded, "ssn") if excluded else ("ssn",)
+        return excluded
+
     def delete_view(self, request, object_id, extra_context=None):
         extra_context = extra_context or {}
         extra_context["custom_message"] = (

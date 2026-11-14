@@ -1,5 +1,12 @@
 .github
 .gitignore
+.git
+.env
+.env.*
+!.env.dist
+0. Token.txt
+venv_test
+TestDB_Horilla.sqlite3
 *.md
 LICENSE
 docker-compose.yaml

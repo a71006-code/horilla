@@ -26,7 +26,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.cache import cache
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db import models
 from django.db.models import F, ProtectedError
 from django.db.models.query import QuerySet
@@ -1111,6 +1111,8 @@ def employee_view(request):
 def view_employee_bulk_update(request):
     if request.method == "POST":
         update_fields = request.POST.getlist("update_fields")
+        if "ssn" in update_fields:
+            raise PermissionDenied
         bulk_employee_ids = request.POST.get("bulk_employee_ids")
         bulk_employee_ids_str = (
             json.dumps(bulk_employee_ids) if bulk_employee_ids else ""
@@ -1329,6 +1331,8 @@ def save_employee_bulk_update(request):
     if request.method == "POST":
         update_fields_str = request.POST.get("update_fields", "")
         update_fields = json.loads(update_fields_str) if update_fields_str else []
+        if "ssn" in update_fields:
+            raise PermissionDenied
         dict_value = request.__dict__["_post"]
         bulk_employee_ids_str = request.POST.get("bulk_employee_ids", "")
         bulk_employee_ids = (
@@ -2521,6 +2525,7 @@ def employee_export(_):
     field_names = [f.name for f in Employee._meta.get_fields() if not f.auto_created]
     field_names.remove("employee_user_id")
     field_names.remove("employee_profile")
+    field_names.remove("ssn")
     field_names.remove("additional_info")
     field_names.remove("is_from_onboarding")
     field_names.remove("is_directly_converted")

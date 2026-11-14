@@ -11,6 +11,9 @@
     </div>
 {% endif %}
 <div class="oh-payslip__summary">
+    {% if request.user.is_superuser and instance.status == "paid" %}
+        <a class="oh-btn oh-btn--secondary" href="{% url 'review-ca-paycheck' instance.pk %}">{% trans "Review California tax facts" %}</a>
+    {% endif %}
     <div class="oh-payslip__user-detail">
         <h3 class="oh-payslip__employee-title">
             {% trans "Employee Details" %}

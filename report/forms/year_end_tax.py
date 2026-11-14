@@ -234,7 +234,7 @@ def build_w2_w3_context(payslips, company=None, year=None):
 
         rounded = row.copy()
         for key, value in row.items():
-            if key.startswith("box_"):
+            if key.startswith("box_") and key != "box_14_label":
                 rounded[key] = money(value)
         w2_rows.append(rounded)
 

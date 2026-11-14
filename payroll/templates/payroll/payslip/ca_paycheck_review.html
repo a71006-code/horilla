@@ -1,0 +1,64 @@
+{% extends "index.html" %}
+{% load i18n %}
+
+{% block content %}
+<section class="oh-card m-3 p-4">
+  <h1>{% trans "Review California paid check" %}</h1>
+  <p>{{ payslip.employee_id }} · {{ payslip.start_date }} – {{ payslip.end_date }}</p>
+  <p>
+    {% trans "Paid gross" %} ${{ payslip.gross_pay|floatformat:2 }} ·
+    {% trans "Paid net" %} ${{ payslip.net_pay|floatformat:2 }}
+  </p>
+  {% if recorded %}
+    <p role="status">{% trans "Tax facts recorded for" %} {{ recorded.employer }} · {{ recorded.paid_on }}.</p>
+    {% if edd_review %}
+      <p>{% trans "Supplemental EDD facts recorded" %} · ${{ edd_review.subject_wages }} · {{ edd_review.plan_code }}</p>
+    {% elif edd_form %}
+      <h2>{% trans "Supply missing EDD facts for DE 9C" %}</h2>
+      <form method="post">
+        {% csrf_token %}
+        {{ edd_form.as_p }}
+        <button class="oh-btn oh-btn--primary" type="submit" name="action" value="supplement_edd">{% trans "Record reviewed EDD facts" %}</button>
+      </form>
+    {% endif %}
+    <a href="{% url 'view-created-payslip' payslip.pk %}">{% trans "Back to payslip" %}</a>
+  {% else %}
+    <p>{% trans "Use the verified payroll register and withholding certificates. Enter prior wages for this employee and legal employer. Record checks paid on the same date in payment order." %}</p>
+    <p>{% trans "This review covers regular cash wages paid in 2026. It does not issue a payment or file a return." %}</p>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      {% for field in form %}
+        {% if field.name != "verified_payment" %}
+          <p>{{ field.label_tag }} {{ field }} {{ field.errors }}</p>
+        {% endif %}
+      {% endfor %}
+      <button class="oh-btn oh-btn--secondary" type="submit" name="action" value="preview">{% trans "Preview calculation" %}</button>
+
+      {% if calculation %}
+        <h2 class="mt-4">{% trans "Calculated amounts" %}</h2>
+        <dl>
+          <dt>{% trans "Federal income tax" %}</dt><dd>${{ calculation.federal_income_tax }}</dd>
+          <dt>{% trans "California income tax" %}</dt><dd>${{ calculation.ca_pit_withheld }}</dd>
+          <dt>{% trans "Social Security, employee / employer" %}</dt><dd>${{ calculation.contributions.employee_social_security }} / ${{ calculation.contributions.employer_social_security }}</dd>
+          <dt>{% trans "Medicare, employee / employer" %}</dt><dd>${{ calculation.contributions.employee_medicare }} / ${{ calculation.contributions.employer_medicare }}</dd>
+          <dt>{% trans "Additional Medicare, employee" %}</dt><dd>${{ calculation.contributions.employee_additional_medicare }}</dd>
+          <dt>{% trans "California SDI, employee" %}</dt><dd>${{ calculation.contributions.employee_ca_sdi }}</dd>
+          <dt>{% trans "California UI, employer" %}</dt><dd>${{ calculation.contributions.employer_ca_ui }}</dd>
+          <dt>{% trans "California ETT, employer" %}</dt><dd>${{ calculation.contributions.employer_ca_ett }}</dd>
+          <dt>{% trans "Federal unemployment, employer before credits" %}</dt><dd>${{ calculation.contributions.employer_futa_before_credits }}</dd>
+          <dt>{% trans "Other employee deductions" %}</dt><dd>${{ calculation.other_employee_deductions }}</dd>
+          <dt>{% trans "Calculated net pay" %}</dt><dd>${{ calculation.net_pay }}</dd>
+        </dl>
+        {% if matches_payment %}
+          <input type="hidden" name="review_token" value="{{ review_token }}">
+          <p>{{ form.verified_payment }} {{ form.verified_payment.label_tag }} {{ form.verified_payment.errors }}</p>
+          <button class="oh-btn oh-btn--primary" type="submit" name="action" value="record">{% trans "Record reviewed check" %}</button>
+        {% else %}
+          <p role="alert">{% trans "Calculated net pay does not match the paid payslip. Reconcile the difference before recording." %}</p>
+        {% endif %}
+      {% endif %}
+    </form>
+  {% endif %}
+</section>
+{% endblock content %}

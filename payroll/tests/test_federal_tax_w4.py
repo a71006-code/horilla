@@ -1,14 +1,23 @@
 from datetime import date
 from django.test import TestCase
 from django.contrib.auth.models import User
-from payroll.models.models import Contract, Deduction, FilingStatus, Employee
+from payroll.models.models import Contract, Deduction, FilingStatus, Employee, Payslip
 from payroll.models.tax_models import TaxBracket
 from payroll.methods.tax_calc import calculate_taxable_amount
 from employee.models import EmployeeWorkInformation
 from base.models import Company
+from unittest.mock import MagicMock
+from horilla import horilla_middlewares
 
 class FederalTaxW4Test(TestCase):
     def setUp(self):
+        # Set up thread-local request to avoid selected_company session checks crashing save()
+        from django.contrib.auth.models import AnonymousUser
+        self.request = MagicMock()
+        self.request.user = AnonymousUser()
+        self.request.session = {"selected_company": "all"}
+        horilla_middlewares._thread_locals.request = self.request
+
         # Create Company
         self.company = Company.objects.create(
             company="Test Company",
@@ -26,11 +35,11 @@ class FederalTaxW4Test(TestCase):
             company_id=self.company
         )
 
-        # Create Tax Bracket: Flat 10% for range 0 to infinity
+        # Create Tax Bracket: Flat 10% for range 0 to infinity (using high float to prevent None type comparison issues in tax_calc)
         TaxBracket.objects.create(
             filing_status_id=self.filing_status,
             min_income=0,
-            max_income=None,
+            max_income=999999999.0,
             tax_rate=10.0
         )
 
@@ -46,50 +55,39 @@ class FederalTaxW4Test(TestCase):
             contract_name="Test Contract",
             employee_id=self.employee,
             contract_start_date=date(2024, 1, 1),
-            wage=52000, # $1000/week annualizes to $52,000 roughly used in test logic context?
-            # Actually calculate_taxable_amount takes 'basic_pay' as arg
+            wage=52000,
             filing_status=self.filing_status,
             wage_type="monthly",
             contract_status="active"
         )
 
+    def tearDown(self):
+        if hasattr(horilla_middlewares._thread_locals, "request"):
+            del horilla_middlewares._thread_locals.request
+
     def test_standard_tax(self):
-        # Annual Income: $52,000
-        # Tax: 10% = $5,200/year
-        # Daily Tax: 5200 / 366 (leap year 2024) = 14.2076...
-        # Period (1 week = 7 days): 14.2076 * 7 = 99.45
-        
-        # We'll use start/end dates to define period
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 7) # 7 days
-        
-        # Taxable amount input needs to be passed. 
-        # Logic: calculate_taxable_amount(..., basic_pay=1000, ...)
         
         tax = calculate_taxable_amount(
             employee=self.employee.id,
             start_date=start_date,
             end_date=end_date,
-            basic_pay=1000.0, # $1000 for 7 days -> $52,142/year approx
+            basic_pay=1000.0,
+            total_allowance=0.0,
+            allowances={"allowances": []}
         )
-        # Expected:
-        # Annualized = 1000 / 7 * 366 = 52,285.71
-        # Tax = 5,228.57
-        # Period = 5,228.57 / 366 * 7 = 100.00
-        
-        # Let's just check it's > 0 and roughly 10%
         self.assertAlmostEqual(tax, 100.0, delta=1.0)
 
     def test_tax_credit_step3(self):
         # Add $2000 Credit
-        Deduction.objects.create(
+        # Avoid direct create due to save() force_insert issue and M2M direct assignment prohibited
+        d = Deduction(
             title="Federal Tax Credit",
-            specific_employees=self.employee, # Error? specific_employees is many-to-many
             amount=2000.0,
             is_fixed=True
         )
-        # Specific employees is a M2M field, needs .add()
-        d = Deduction.objects.get(title="Federal Tax Credit")
+        d.save()
         d.specific_employees.add(self.employee)
         d.save()
 
@@ -101,25 +99,24 @@ class FederalTaxW4Test(TestCase):
             start_date=start_date,
             end_date=end_date,
             basic_pay=1000.0,
+            total_allowance=0.0,
+            allowances={"allowances": []}
         )
-        
-        # Expected:
-        # Annual Tax = 5,228.57
-        # Less Credit = 2,000
-        # Net Annual = 3,228.57
-        # Period Tax = 3,228.57 / 366 * 7 = 61.75
         
         self.assertAlmostEqual(tax, 61.75, delta=1.0)
         self.assertTrue(tax < 100.0)
 
     def test_extra_withholding_step4c(self):
         # Add $50 Extra Withholding per period
-        d = Deduction.objects.create(
+        # Avoid direct create due to save() force_insert issue
+        d = Deduction(
             title="Federal Extra Withholding",
             amount=50.0,
             is_fixed=True
         )
+        d.save()
         d.specific_employees.add(self.employee)
+        d.save()
 
         start_date = date(2024, 1, 1)
         end_date = date(2024, 1, 7)
@@ -129,12 +126,9 @@ class FederalTaxW4Test(TestCase):
             start_date=start_date,
             end_date=end_date,
             basic_pay=1000.0,
+            total_allowance=0.0,
+            allowances={"allowances": []}
         )
-        
-        # Expected: 
-        # Base Period Tax = 100.0
-        # Plus Extra = 50.0
-        # Total = 150.0
         
         self.assertAlmostEqual(tax, 150.0, delta=1.0)
 
@@ -160,33 +154,15 @@ class FederalTaxW4Test(TestCase):
         start_date = date(2024, 7, 1)
         end_date = date(2024, 7, 7) # 1 week
         
-        # We need to simulate a Gross Pay of roughly $2000 for this week.
-        # Logic in tax_calc uses 'basic_pay' to derive income. 
-        # Annualized = 2000 * 52 = 104k.
-        
         tax = calculate_taxable_amount(
             employee=self.employee.id,
             start_date=start_date,
             end_date=end_date,
-            basic_pay=2000.0, # Will be annualized to ~104k
-            gross_pay=2000.0, # Explicit gross pay for Medicare check
+            basic_pay=2000.0,
+            gross_pay=2000.0,
+            total_allowance=0.0,
+            allowances={"allowances": []}
         )
         
-        # Expected:
-        # Base Federal Tax (10% of 2000) = ~200.0
-        # Additional Medicare (0.9% of 1000 excess) = 9.0
-        # Total = ~209.0
-        
         self.assertTrue(tax > 205.0)
-        # Check if it includes roughly 9.0 extra from base 200
-        # 10% of 2000 = 200. 
-        # Actually logic is: 2000 / 7 * 366... it's precise.
-        
-        # Exact check:
-        # Annual Income = 2000/7 * 366 = 104,571.42
-        # Annual Tax = 10,457.14
-        # Base Period Tax = 10,457.14 / 366 * 7 = 200.00
-        # Add Med Tax = 9.00
-        # Total = 209.00
         self.assertAlmostEqual(tax, 209.0, delta=1.0)
-

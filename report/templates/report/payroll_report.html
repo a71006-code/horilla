@@ -1,5 +1,10 @@
 {% extends "index.html" %}
 {% block content %}
+{% if request.user.is_superuser %}
+    <a class="oh-btn oh-btn--secondary m-3" href="{% url 'ca-quarterly-worksheet' %}">California quarterly worksheet</a>
+    <a class="oh-btn oh-btn--secondary m-3" href="{% url 'ca-annual-worksheet' %}">California year-end worksheet</a>
+    <a class="oh-btn oh-btn--secondary m-3" href="{% url 'ca-filing-profile' %}">California employer filing profile</a>
+{% endif %}
 {% load static %}
 {% load i18n %}
 
@@ -392,17 +397,19 @@
     </select>
 
     <!-- Download PDF Button -->
+    {% if request.user.is_superuser %}
+    <p>{% trans "Legacy tax previews and exports use payslip work periods. Review the California worksheets for amounts based on recorded payment dates." %}</p>
     <button id="download-tax-forms-btn" class="oh-btn oh-btn--secondary ml-2 mb-2" style="display:none;">
         <ion-icon name="document-text-outline" class="mr-1"></ion-icon>
-        {% trans "Download Tax Forms (PDF)" %}
+        {% trans "Legacy Tax Forms (PDF)" %}
     </button>
     <button id="download-w2-w3-forms-btn" class="oh-btn oh-btn--secondary ml-2 mb-2" style="display:none;">
         <ion-icon name="document-attach-outline" class="mr-1"></ion-icon>
-        {% trans "Download W-2/W-3 (PDF)" %}
+        {% trans "Legacy W-2/W-3 (PDF)" %}
     </button>
     <button id="download-w2-w3-csv-btn" class="oh-btn oh-btn--secondary ml-2 mb-2" style="display:none;">
         <ion-icon name="download-outline" class="mr-1"></ion-icon>
-        {% trans "Export W-2/W-3 (CSV)" %}
+        {% trans "Legacy W-2/W-3 (CSV)" %}
     </button>
     <div id="preview-tax-forms-controls" class="d-inline-flex align-items-center ml-2 mb-2" style="display:none;">
         <span class="mr-2">🔍 {% trans "Preview & Edit" %}:</span>
@@ -411,6 +418,7 @@
         <button type="button" class="oh-btn oh-btn--secondary oh-btn--small preview-tax-form-btn mr-1" data-form-type="de9">Form DE9</button>
         <button type="button" class="oh-btn oh-btn--secondary oh-btn--small preview-tax-form-btn" data-form-type="de9c">Form DE9C</button>
     </div>
+    {% endif %}
 
     <!-- Pivot Container -->
     <div id="pivot-container" class="mb-5" style="width: 100%; overflow-x: auto;">

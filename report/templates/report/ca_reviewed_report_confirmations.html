@@ -1,0 +1,37 @@
+{% extends "index.html" %}
+{% block content %}
+<section class="oh-card m-3 p-4">
+  <h1>External filing confirmations</h1>
+  <p>{{ report.employer }} · {{ report.get_kind_display }} · Period beginning {{ report.period_start|date:"Y-m-d" }}</p>
+  {% if identity %}<p>{{ identity.legal_name }} · EIN {{ identity.masked_ein }} · EDD {{ identity.masked_edd_account }}</p>{% endif %}
+  <p><a href="{% url 'download-ca-reviewed-report' report.pk %}">Download the associated reviewed draft</a></p>
+  <details><summary>Saved sources and review inputs</summary><pre>{{ source_summary }}</pre></details>
+  {% if void_form.is_bound %}{{ void_form.errors }}{% endif %}
+  <ul>{% for confirmation in confirmations %}
+    <li>
+      {{ confirmation.form_code }} · {{ confirmation.filed_on|date:"Y-m-d" }} · {{ confirmation.reference }}
+      {% if confirmation.void_record %}
+        · Voided {{ confirmation.void_record.reviewed_at|date:"Y-m-d" }} · {{ confirmation.void_record.reason }}
+      {% else %}
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="confirmation_id" value="{{ confirmation.pk }}">
+          <label for="void-reason-{{ confirmation.pk }}">Reason for voiding</label>
+          <input id="void-reason-{{ confirmation.pk }}" name="reason" maxlength="200" required>
+          <button name="action" value="void" type="submit" class="oh-btn oh-btn--secondary">Void confirmation</button>
+        </form>
+      {% endif %}
+    </li>
+  {% empty %}<li>No confirmations recorded.</li>{% endfor %}</ul>
+  {% if form.fields.form_code.choices %}
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit" class="oh-btn oh-btn--primary">Record confirmation</button>
+    </form>
+  {% else %}
+    <p>This archived draft has no forms eligible for filing confirmation. Save a new reviewed copy after resolving the missing information.</p>
+  {% endif %}
+  <p><a href="{% url 'ca-reviewed-reports' %}?employer={{ report.employer_id }}">Back to report history</a></p>
+</section>
+{% endblock %}

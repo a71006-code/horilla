@@ -10,6 +10,7 @@ from datetime import date, datetime, timedelta
 from django import forms
 from django.apps import apps
 from django.contrib import messages
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.http import QueryDict
@@ -1501,6 +1502,286 @@ class Payslip(HorillaModel):
         ordering = [
             "-end_date",
         ]
+
+
+class RecordedCaliforniaPaycheckQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValidationError("Recorded tax facts cannot be changed in place.")
+
+    def delete(self):
+        raise ValidationError("Recorded tax facts cannot be deleted in place.")
+
+    def for_period(self, employer_id, start_date, end_exclusive):
+        """Select verified checks by legal employer and actual date paid."""
+        if not employer_id or start_date >= end_exclusive:
+            raise ValueError("A legal employer and a nonempty reporting period are required.")
+        return self.filter(
+            employer_id=employer_id, paid_on__gte=start_date, paid_on__lt=end_exclusive,
+        ).order_by("paid_on", "pk")
+
+
+class RecordedCaliforniaPaycheck(models.Model):
+    """Reviewed facts from a paid check, independent of later payroll edits."""
+
+    payslip = models.OneToOneField(Payslip, on_delete=models.PROTECT)
+    employer = models.ForeignKey(Company, on_delete=models.PROTECT)
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT)
+    work_period_start = models.DateField()
+    work_period_end = models.DateField()
+    paid_on = models.DateField()
+    facts_version = models.PositiveSmallIntegerField(default=1)
+    facts = models.JSONField()
+    recorded_at = models.DateTimeField(auto_now_add=True)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT,
+    )
+
+    objects = RecordedCaliforniaPaycheckQuerySet.as_manager()
+
+    class Meta:
+        indexes = [models.Index(fields=["employer", "paid_on"], name="payroll_ca_employer_paid_idx")]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding or self.pk is not None:
+            raise ValidationError("Recorded tax facts cannot be changed in place.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Recorded tax facts cannot be deleted in place.")
+
+
+class RecordedCaliforniaTaxDeposit(models.Model):
+    """An externally confirmed deposit allocated to a quarterly return."""
+
+    class Kind(models.TextChoices):
+        FEDERAL_941 = "federal_941", "IRS Form 941"
+        CALIFORNIA_DE9 = "ca_de9", "California DE 9"
+        FEDERAL_940 = "federal_940", "IRS Form 940"
+
+    employer = models.ForeignKey(Company, on_delete=models.PROTECT)
+    kind = models.CharField(max_length=16, choices=Kind.choices)
+    period_start = models.DateField()
+    deposited_on = models.DateField()
+    amount = models.DecimalField(max_digits=14, decimal_places=2)
+    reference = models.CharField(max_length=80)
+    recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    recorded_at = models.DateTimeField(auto_now_add=True)
+    voided_at = models.DateTimeField(null=True, blank=True)
+    voided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT,
+        related_name="voided_california_deposits",
+    )
+    void_reason = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employer", "kind", "reference"], condition=models.Q(voided_at__isnull=True),
+                name="payroll_ca_deposit_ref_uniq",
+            ),
+            models.CheckConstraint(check=models.Q(amount__gt=0), name="payroll_ca_deposit_positive"),
+            models.UniqueConstraint(
+                fields=["employer", "reference"],
+                condition=models.Q(voided_at__isnull=True, kind__in=("federal_941", "federal_940")),
+                name="payroll_ca_irs_ref_uniq",
+            ),
+        ]
+        indexes = [models.Index(fields=["employer", "period_start"], name="payroll_ca_deposit_period_idx")]
+
+
+class CaliforniaEmployerFilingProfile(models.Model):
+    class FederalReturn(models.TextChoices):
+        QUARTERLY = "941", "Form 941"
+        ANNUAL = "944", "Form 944 (outside this worksheet)"
+
+    employer = models.ForeignKey(Company, on_delete=models.PROTECT)
+    year = models.PositiveSmallIntegerField()
+    legal_name = models.CharField(max_length=160)
+    ein = models.CharField(max_length=9)
+    edd_account = models.CharField(max_length=8)
+    federal_return = models.CharField(max_length=3, choices=FederalReturn.choices)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    reviewed_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["employer", "year"], name="payroll_ca_profile_employer_year"),
+            models.UniqueConstraint(fields=["ein", "year"], name="payroll_ca_profile_ein_year"),
+            models.UniqueConstraint(fields=["edd_account", "year"], name="payroll_ca_profile_edd_year"),
+        ]
+
+    @property
+    def masked_ein(self):
+        return f"••-•••{self.ein[-4:]}"
+
+    @property
+    def masked_edd_account(self):
+        return f"••••{self.edd_account[-4:]}"
+
+
+class TaxReviewQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValidationError("Recorded reviews cannot be edited in place.")
+
+    def delete(self):
+        raise ValidationError("Recorded reviews cannot be deleted in place.")
+
+
+class RecordedTaxReview(models.Model):
+    objects = TaxReviewQuerySet.as_manager()
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding or self.pk is not None:
+            raise ValidationError("Recorded reviews cannot be edited in place.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Recorded reviews cannot be deleted in place.")
+
+
+class CaliforniaFilingProfileRevision(RecordedTaxReview):
+    profile = models.ForeignKey(CaliforniaEmployerFilingProfile, on_delete=models.PROTECT, related_name="revisions")
+    legal_name = models.CharField(max_length=160)
+    ein = models.CharField(max_length=9)
+    edd_account = models.CharField(max_length=8)
+    federal_return = models.CharField(max_length=3)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    reviewed_at = models.DateTimeField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("profile", "reviewed_at"), name="payroll_ca_profile_revision_unique"),
+        ]
+
+    @property
+    def masked_ein(self):
+        return "•••••" + self.ein[-4:]
+
+    @property
+    def masked_edd_account(self):
+        return "••••" + self.edd_account[-4:]
+
+
+class CaliforniaQuarterReview(RecordedTaxReview):
+    """A review of the recorded sources, not a certification or filed return."""
+
+    class DepositSchedule(models.TextChoices):
+        MONTHLY = "monthly", "Monthly liability schedule"
+        SEMIWEEKLY = "semiweekly", "Semiweekly liability schedule (Schedule B)"
+        DE_MINIMIS = "de_minimis", "Verified de minimis exception"
+
+    employer = models.ForeignKey(Company, on_delete=models.PROTECT)
+    period_start = models.DateField()
+    fingerprint = models.CharField(max_length=64)
+    deposit_schedule = models.CharField(max_length=16, choices=DepositSchedule.choices)
+    federal_headcount = models.PositiveIntegerField()
+    edd_headcounts = models.JSONField()
+    check_count = models.PositiveIntegerField()
+    gross_pay = models.DecimalField(max_digits=14, decimal_places=2)
+    federal_deposits = models.DecimalField(max_digits=14, decimal_places=2)
+    california_deposits = models.DecimalField(max_digits=14, decimal_places=2)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["employer", "period_start"], name="payroll_ca_qreview_period_idx")]
+
+
+class CaliforniaPaidCheckEddReview(RecordedTaxReview):
+    """Verified DE 9C fields appended to an older paid-check record."""
+
+    paid_check = models.OneToOneField(
+        RecordedCaliforniaPaycheck, on_delete=models.PROTECT, related_name="edd_review", db_column="check_id",
+    )
+    subject_wages = models.DecimalField(max_digits=14, decimal_places=2)
+    plan_code = models.CharField(max_length=1)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+
+
+class CaliforniaFiledQuarterTotals(RecordedTaxReview):
+    """Independent comparison figures from filed 941 and DE 9C reports."""
+
+    profile = models.ForeignKey(CaliforniaEmployerFilingProfile, on_delete=models.PROTECT)
+    profile_reviewed_at = models.DateTimeField()
+    period_start = models.DateField()
+    amounts = models.JSONField()
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["profile", "profile_reviewed_at", "period_start"],
+                name="payroll_ca_filed_quarter_idx",
+            ),
+        ]
+
+
+class CaliforniaFiledDe9c(RecordedTaxReview):
+    """An independent transcription of one quarter's filed employee wage rows."""
+
+    profile = models.ForeignKey(CaliforniaEmployerFilingProfile, on_delete=models.PROTECT)
+    profile_reviewed_at = models.DateTimeField()
+    period_start = models.DateField()
+    employee_rows = models.JSONField()
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["profile", "period_start", "profile_reviewed_at"],
+                name="payroll_ca_filed_de9c_idx",
+            ),
+        ]
+
+
+class CaliforniaReviewedReport(RecordedTaxReview):
+    """The exact draft CSV reviewed for an accountant handoff."""
+
+    class Kind(models.TextChoices):
+        QUARTERLY = "quarterly", "941, DE 9 and DE 9C"
+        FUTA = "futa", "Form 940"
+        WAGE_STATEMENTS = "wage_statements", "W-2 and W-3"
+
+    employer = models.ForeignKey(Company, on_delete=models.PROTECT)
+    period_start = models.DateField()
+    kind = models.CharField(max_length=16, choices=Kind.choices)
+    digest = models.CharField(max_length=64)
+    source_records = models.JSONField()
+    csv_text = models.TextField()
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employer", "period_start", "kind", "digest"],
+                name="payroll_ca_reviewed_report_unique",
+            ),
+        ]
+
+
+class CaliforniaFiledReportConfirmation(RecordedTaxReview):
+    """An agency receipt attached to the specific reviewed worksheet."""
+
+    report = models.ForeignKey(CaliforniaReviewedReport, on_delete=models.PROTECT, related_name="filing_confirmations")
+    form_code = models.CharField(max_length=4)
+    reference = models.CharField(max_length=80)
+    filed_on = models.DateField()
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+
+
+class CaliforniaFilingConfirmationVoid(RecordedTaxReview):
+    confirmation = models.OneToOneField(CaliforniaFiledReportConfirmation, on_delete=models.PROTECT, related_name="void_record")
+    reason = models.CharField(max_length=200)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    reviewed_at = models.DateTimeField(auto_now_add=True)
 
 
 class LoanAccount(HorillaModel):

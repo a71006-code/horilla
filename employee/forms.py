@@ -218,6 +218,7 @@ class EmployeeForm(ModelForm):
             "is_from_onboarding",
             "is_directly_converted",
             "is_active",
+            "ssn",
         )
 
     def __init__(self, *args, **kwargs):

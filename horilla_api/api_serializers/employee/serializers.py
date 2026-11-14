@@ -67,7 +67,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Employee
-        fields = "__all__"
+        exclude = ("ssn",)
 
     def create(self, validated_data):
         validated_data["badge_id"] = get_next_badge_id()

@@ -1,0 +1,33 @@
+{% extends "index.html" %}
+{% block content %}
+<section class="oh-card m-3 p-4">
+  <h1>California payroll report history</h1>
+  <form method="get">
+    <label for="employer-select">Employer</label>
+    <select id="employer-select" name="employer" required>
+      <option value="">Select a legal employer</option>
+      {% for company in companies %}
+        <option value="{{ company.pk }}" {% if company.pk == employer.pk %}selected{% endif %}>{{ company }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="oh-btn oh-btn--secondary">Show history</button>
+  </form>
+  {% if employer %}
+    <table class="oh-table">
+      <thead><tr><th scope="col">Report</th><th scope="col">Period begins</th><th scope="col">Reviewed by</th><th scope="col">Saved</th><th scope="col">CSV</th></tr></thead>
+      <tbody>
+        {% for report in reports %}
+          <tr>
+            <th scope="row">{{ report.get_kind_display }}</th><td>{{ report.period_start|date:"Y-m-d" }}</td>
+            <td>{{ report.reviewed_by }}</td><td>{{ report.reviewed_at }}</td>
+            <td>
+              <a href="{% url 'download-ca-reviewed-report' report.pk %}">Download reviewed draft</a>
+              · <a href="{% url 'ca-reviewed-report-confirmations' report.pk %}">Filing confirmations</a>
+            </td>
+          </tr>
+        {% empty %}<tr><td colspan="5">No reviewed drafts saved for this employer.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</section>
+{% endblock %}

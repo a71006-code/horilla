@@ -58,12 +58,25 @@ if apps.is_installed("leave"):
     )
 
 if apps.is_installed("payroll"):
+    from report.views.ca_annual_worksheet import ca_annual_worksheet
+    from report.views.ca_de9c_reconciliation import ca_de9c_reconciliation
+    from report.views.ca_filing_profile import ca_filing_profile
+    from report.views.ca_quarterly_worksheet import ca_quarterly_worksheet
+    from report.views.ca_reviewed_reports import ca_reviewed_report_confirmations, ca_reviewed_reports
+
     urlpatterns.extend(
         [
             path(
                 "payroll-report", payroll_report.payroll_report, name="payroll-report"
             ),
             path("payroll-pivot", payroll_report.payroll_pivot, name="payroll-pivot"),
+            path("ca-quarterly-worksheet/", ca_quarterly_worksheet, name="ca-quarterly-worksheet"),
+            path("ca-annual-worksheet/", ca_annual_worksheet, name="ca-annual-worksheet"),
+            path("ca-de9c-reconciliation/", ca_de9c_reconciliation, name="ca-de9c-reconciliation"),
+            path("ca-filing-profile/", ca_filing_profile, name="ca-filing-profile"),
+            path("ca-reviewed-reports/", ca_reviewed_reports, name="ca-reviewed-reports"),
+            path("ca-reviewed-reports/<int:report_id>/csv/", ca_reviewed_reports, name="download-ca-reviewed-report"),
+            path("ca-reviewed-reports/<int:report_id>/confirmations/", ca_reviewed_report_confirmations, name="ca-reviewed-report-confirmations"),
             path(
                 "download-tax-forms", 
                 payroll_report.download_tax_forms, 

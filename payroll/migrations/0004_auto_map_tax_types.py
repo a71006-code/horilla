@@ -14,7 +14,7 @@ def map_tax_types(apps, schema_editor):
     updated_count = 0
     for name, code in mapping.items():
         # Case-insensitive match
-        rows = Deduction.objects.filter(name__iexact=name).update(tax_reporting_type=code)
+        rows = Deduction.objects.filter(title__iexact=name).update(tax_reporting_type=code)
         updated_count += rows
         print(f"Mapped {name} -> {code}: {rows} rows")
         
